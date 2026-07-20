@@ -20,6 +20,7 @@ button{cursor:pointer}
 button:hover{border-color:#3d4854}
 button.primary{background:var(--acc);color:#1a1206;border-color:var(--acc);font-weight:650}
 button.danger{background:#3a1e1e;border-color:#5b2a2a;color:#ff9a9a}
+button:disabled{opacity:.5;cursor:default}
 .badge{font-size:11px;padding:2px 7px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);color:var(--mut)}
 main{display:grid;grid-template-columns:1fr 380px;height:calc(100vh - 53px)}
 @media(max-width:900px){main{grid-template-columns:1fr;height:auto}}
@@ -64,14 +65,39 @@ label{display:block;font-size:12px;color:var(--mut);margin:10px 0 4px}
 #msg{font-size:12px;margin-top:10px;min-height:16px}
 hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 code{background:#0b0e12;padding:1px 5px;border-radius:4px;font-size:12px}
+h3{font-size:13px;margin:0 0 2px;letter-spacing:.3px;text-transform:uppercase;color:var(--acc)}
+.box{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+#gate{position:fixed;inset:0;background:#0b0e12;z-index:50;display:none;align-items:center;justify-content:center;padding:20px}
+#gate.on{display:flex}
+#gate .g{width:100%;max-width:360px;text-align:center}
+#gate .lk{font-size:44px;margin-bottom:10px}
+#gate h2{font-size:19px;margin:0 0 6px}
+#gate p{color:var(--mut);font-size:13px;margin:0 0 20px}
+#gate input{width:100%;text-align:center;padding:11px;font-size:15px}
+#gate button{width:100%;margin-top:10px;padding:11px}
+#gateMsg{font-size:12.5px;min-height:18px;margin-top:10px}
 </style>
 </head>
 <body>
+
+<div id="gate">
+  <div class="g">
+    <div class="lk">🔒</div>
+    <h2>Mapa de Guinchos &amp; Para-brisas</h2>
+    <p>Conteúdo protegido. Informe a senha de acesso.</p>
+    <input id="gPwd" type="password" placeholder="Senha de acesso" autocomplete="current-password">
+    <button class="primary" id="gBtn">Entrar</button>
+    <div id="gateMsg"></div>
+  </div>
+</div>
+
 <header>
   <h1>🚨 Mapa de Guinchos &amp; Para-brisas</h1>
   <span class="badge" id="cnt">0 empresas</span>
   <span class="badge" id="src">carregando…</span>
+  <span class="badge" id="secBadge" style="display:none"></span>
   <span class="sp"></span>
+  <button id="btnLock" style="display:none">🔒 Bloquear</button>
   <button id="btnExport">Exportar JSON</button>
   <button id="btnAdmin">🔑 Admin</button>
 </header>
@@ -138,58 +164,120 @@ code{background:#0b0e12;padding:1px 5px;border-radius:4px;font-size:12px}
     </div>
 
     <div class="pane" id="p-cfg">
-      <div class="hint" style="margin:0 0 8px">Para salvar de forma permanente, o site grava o arquivo <code>empresas.json</code> no seu repositório via API do GitHub. Sem token, as alterações ficam só neste navegador.</div>
-      <label>Usuário/Org do GitHub</label>
-      <input class="f" id="cOwner" placeholder="felipemees">
-      <label>Repositório</label>
-      <input class="f" id="cRepo" placeholder="mapa-guinchos">
-      <div class="row">
-        <div><label>Branch</label><input class="f" id="cBranch" placeholder="main"></div>
-        <div><label>Caminho do arquivo</label><input class="f" id="cPath" placeholder="empresas.json"></div>
+
+      <div class="box">
+        <h3>1 · Repositório</h3>
+        <div class="hint" style="margin-top:0">Onde o arquivo <code>empresas.json</code> é gravado.</div>
+        <label>Usuário/Org do GitHub</label>
+        <input class="f" id="cOwner" placeholder="Timberzada">
+        <label>Repositório</label>
+        <input class="f" id="cRepo" placeholder="mapa-guinchos">
+        <div class="row">
+          <div><label>Branch</label><input class="f" id="cBranch" placeholder="main"></div>
+          <div><label>Arquivo</label><input class="f" id="cPath" placeholder="empresas.json"></div>
+        </div>
+        <div style="margin-top:12px"><button id="btnRepoSave">Salvar repositório</button></div>
       </div>
-      <label>Token de acesso (PAT)</label>
-      <input class="f" id="cToken" type="password" placeholder="github_pat_…">
-      <div class="row" style="margin-top:14px">
-        <button class="primary" id="btnCfgSave">Salvar configuração</button>
-        <button class="danger" id="btnCfgClear" style="flex:0 0 auto">Sair</button>
+
+      <div class="box">
+        <h3>2 · Admin (token)</h3>
+        <div class="hint" style="margin-top:0">O token do GitHub é guardado <b>criptografado</b> neste navegador e só abre com a senha de admin.</div>
+        <div id="admLocked">
+          <label>Senha de admin</label>
+          <input class="f" id="cAdmPwd" type="password" placeholder="sua senha de admin" autocomplete="off">
+          <label>Token do GitHub (só na primeira vez)</label>
+          <input class="f" id="cToken" type="password" placeholder="github_pat_… (deixe vazio se já salvou)" autocomplete="off">
+          <div class="row" style="margin-top:12px">
+            <button class="primary" id="btnAdmUnlock">Destravar admin</button>
+            <button class="danger" id="btnAdmForget" style="flex:0 0 auto">Esquecer</button>
+          </div>
+        </div>
+        <div id="admOpen" style="display:none">
+          <div class="ok" style="font-size:12.5px">✓ Modo admin ativo — as alterações são gravadas no GitHub.</div>
+          <div style="margin-top:10px"><button id="btnAdmLock">Travar admin</button></div>
+        </div>
+        <div id="admMsg" style="font-size:12px;margin-top:10px"></div>
       </div>
-      <div id="cfgMsg" style="font-size:12px;margin-top:10px"></div>
-      <hr>
-      <label style="margin-top:0">Importar backup (.json)</label>
-      <input class="f" type="file" id="fImport" accept="application/json">
+
+      <div class="box">
+        <h3>3 · Senha de acesso</h3>
+        <div class="hint" style="margin-top:0">Criptografa a lista de empresas no repositório. Sem ela ninguém lê o arquivo, nem baixando direto do GitHub. Requer modo admin ativo.</div>
+        <label>Nova senha de acesso</label>
+        <input class="f" id="cAccPwd" type="password" placeholder="mínimo 10 caracteres" autocomplete="off">
+        <label>Repetir</label>
+        <input class="f" id="cAccPwd2" type="password" autocomplete="off">
+        <div class="row" style="margin-top:12px">
+          <button class="primary" id="btnAccSet">Aplicar senha de acesso</button>
+          <button class="danger" id="btnAccOff" style="flex:0 0 auto">Remover</button>
+        </div>
+        <div id="accMsg" style="font-size:12px;margin-top:10px"></div>
+      </div>
+
+      <div class="box">
+        <h3>4 · Backup</h3>
+        <label style="margin-top:0">Importar backup (.json)</label>
+        <input class="f" type="file" id="fImport" accept="application/json">
+        <div id="impMsg" style="font-size:12px;margin-top:10px"></div>
+      </div>
+
       <div class="hint">
-        <b>Como criar o token:</b> GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → só o repositório do mapa, permissão <code>Contents: Read and write</code>.<br>
-        O token fica salvo apenas no seu navegador (localStorage). Nunca comite o token no repositório.
+        <b>Token:</b> GitHub → Settings → Developer settings → Personal access tokens → Fine-grained → só este repositório, permissão <code>Contents: Read and write</code>.<br>
+        <b>Aviso:</b> a segurança da lista depende inteiramente da força da senha de acesso — use uma senha longa. Quem tiver a senha consegue ler tudo.
       </div>
     </div>
   </aside>
 </main>
 
 <script>
-const LS='mapaGuinchos.cfg', LSD='mapaGuinchos.dados';
+const LS_CFG='mapaGuinchos.cfg', LS_TOK='mapaGuinchos.tok', LS_CACHE='mapaGuinchos.cache';
 const CORES={guincho:'#ffb020',parabrisa:'#3b9dff',ambos:'#31d07a'};
 const ROTULO={guincho:'Guincho',parabrisa:'Para-brisa',ambos:'Guincho + Para-brisa'};
 const FORA={RN:[965,262],PB:[965,296],PE:[965,330],AL:[965,364],SE:[965,398],ES:[930,576],RJ:[930,668],DF:[648,462]};
-const VBW=1010;
+const VBW=1010, ITER=310000;
 
-let MAPA=null, CIDADES=null, DADOS=[], cfg=cargaCfg(), sha=null, remoto=false;
-let ufSel='', destaque=null;
+let MAPA=null, CIDADES=null, DADOS=[], cfg=carregaCfg();
+let DKEY=null, DKDF=null;      // chave/params da senha de acesso (null = arquivo em texto puro)
+let TOKEN=null;                // token destravado em memória
+let sha=null, ufSel='', destaque=null, pronto=false;
 const $=s=>document.querySelector(s);
 
-function cargaCfg(){ try{return JSON.parse(localStorage.getItem(LS))||{}}catch(e){return {}} }
-function salvaCfg(){ localStorage.setItem(LS,JSON.stringify(cfg)); }
+/* ================= cripto ================= */
+const enc=new TextEncoder(), dec=new TextDecoder();
+const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
+const unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function derive(pwd,salt,iter){
+  const base=await crypto.subtle.importKey('raw',enc.encode(pwd),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:iter,hash:'SHA-256'},base,
+    {name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+async function cifra(obj,key){
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(JSON.stringify(obj)));
+  return {iv:b64(iv),ct:b64(ct)};
+}
+async function decifra(pack,key){
+  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(pack.iv)},key,unb64(pack.ct));
+  return JSON.parse(dec.decode(pt));
+}
+function novoKdf(){ return {salt:b64(crypto.getRandomValues(new Uint8Array(16))),iter:ITER}; }
+const kdfKey=(pwd,kdf)=>derive(pwd,unb64(kdf.salt),kdf.iter);
+
+/* ================= util ================= */
+function carregaCfg(){ try{return JSON.parse(localStorage.getItem(LS_CFG))||{}}catch(e){return {}} }
+function salvaCfg(){ localStorage.setItem(LS_CFG,JSON.stringify(cfg)); }
 function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function norm(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function msg(el,t,cls){ el.className=cls||''; el.textContent=t; }
 
-/* ---------- projeção (Mercator, idêntica à usada ao gerar o mapa) ---------- */
+/* ================= projeção ================= */
 function proj(lat,lon){
   const p=MAPA.proj;
-  const my=lat=>Math.log(Math.tan(Math.PI/4+lat*Math.PI/360))*180/Math.PI;
+  const my=l=>Math.log(Math.tan(Math.PI/4+l*Math.PI/360))*180/Math.PI;
   return [ (lon-p.minx)*p.k+p.pad, (p.maxy-my(lat))*p.k+p.pad ];
 }
 
-/* ---------- carregar ---------- */
+/* ================= boot ================= */
 async function boot(){
   [MAPA,CIDADES]=await Promise.all([
     fetch('mapa.json').then(r=>r.json()),
@@ -197,56 +285,100 @@ async function boot(){
   ]);
   desenhaMapa(); montaSelects(); preencheCfg();
   await carregaDados();
-  render();
 }
 
-async function carregaDados(){
+async function buscaArquivo(){
   if(cfg.owner&&cfg.repo){
     try{
       const r=await api('GET');
       if(r.ok){
         const j=await r.json(); sha=j.sha;
-        DADOS=JSON.parse(decodeURIComponent(escape(atob(j.content.replace(/\n/g,'')))));
-        remoto=true; $('#src').textContent='GitHub · '+cfg.repo; $('#src').style.color='#31d07a';
-        localStorage.setItem(LSD,JSON.stringify(DADOS)); return;
+        $('#src').textContent='GitHub · '+cfg.repo; $('#src').style.color='#31d07a';
+        return JSON.parse(dec.decode(unb64(j.content.replace(/\n/g,''))));
       }
     }catch(e){}
   }
   try{
-    const r=await fetch('empresas.json',{cache:'no-store'});
-    if(r.ok){ DADOS=await r.json(); remoto=false; $('#src').textContent='arquivo local'; return; }
+    const r=await fetch((cfg.path||'empresas.json')+'?t='+Date.now(),{cache:'no-store'});
+    if(r.ok){ $('#src').textContent='arquivo do site'; return await r.json(); }
   }catch(e){}
-  DADOS=JSON.parse(localStorage.getItem(LSD)||'[]');
   $('#src').textContent='só neste navegador';
+  return JSON.parse(localStorage.getItem(LS_CACHE)||'[]');
 }
 
+async function carregaDados(){
+  const raw=await buscaArquivo();
+  if(raw && raw.cifrado){
+    DKDF=raw.kdf; window.__pack=raw;
+    $('#gate').classList.add('on'); $('#gPwd').focus();
+    return;
+  }
+  DADOS=Array.isArray(raw)?raw:[];
+  DKEY=null; DKDF=null;
+  finaliza();
+}
+
+function finaliza(){
+  pronto=true;
+  $('#gate').classList.remove('on');
+  const b=$('#secBadge');
+  b.style.display='';
+  b.textContent = DKEY ? '🔒 lista criptografada' : '🌐 lista pública';
+  b.style.color = DKEY ? '#31d07a' : '#8d99a8';
+  $('#btnLock').style.display = DKEY ? '' : 'none';
+  render();
+}
+
+$('#gBtn').onclick=async()=>{
+  const pwd=$('#gPwd').value; const M=$('#gateMsg');
+  if(!pwd) return msg(M,'Digite a senha.','err');
+  msg(M,'Verificando…','');
+  try{
+    const key=await kdfKey(pwd,DKDF);
+    DADOS=await decifra(window.__pack,key);
+    DKEY=key; msg(M,'','');
+    $('#gPwd').value='';
+    finaliza();
+  }catch(e){ msg(M,'Senha incorreta.','err'); }
+};
+$('#gPwd').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#gBtn').click(); });
+$('#btnLock').onclick=()=>{ DKEY=null; TOKEN=null; DADOS=[]; location.reload(); };
+
+/* ================= GitHub ================= */
 function api(method,body){
-  const url=`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${cfg.path||'empresas.json'}`
+  const path=cfg.path||'empresas.json';
+  const url=`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}`
           + (method==='GET'?`?ref=${cfg.branch||'main'}&t=${Date.now()}`:'');
   const h={'Accept':'application/vnd.github+json'};
-  if(cfg.token) h['Authorization']='Bearer '+cfg.token;
+  if(TOKEN) h['Authorization']='Bearer '+TOKEN;
   if(body) h['Content-Type']='application/json';
   return fetch(url,{method,headers:h,body:body?JSON.stringify(body):undefined});
 }
-
+async function payload(){
+  if(!DKEY) return JSON.stringify(DADOS,null,1);
+  const p=await cifra(DADOS,DKEY);
+  return JSON.stringify({cifrado:1,kdf:DKDF,iv:p.iv,ct:p.ct});
+}
 async function persiste(msgEl,acao){
-  localStorage.setItem(LSD,JSON.stringify(DADOS));
-  if(!cfg.token||!cfg.owner||!cfg.repo){
-    msg(msgEl,'Salvo neste navegador. Configure o token do GitHub para publicar no site.','');
-    return true;
+  if(!DKEY) localStorage.setItem(LS_CACHE,JSON.stringify(DADOS));
+  if(!TOKEN||!cfg.owner||!cfg.repo){
+    msg(msgEl,'Salvo só neste navegador. Destrave o modo admin (aba Config) para publicar.','');
+    return false;
   }
   try{
-    const g=await api('GET'); if(g.ok){ sha=(await g.json()).sha; }
-    const conteudo=btoa(unescape(encodeURIComponent(JSON.stringify(DADOS,null,1))));
+    const g=await api('GET'); if(g.ok) sha=(await g.json()).sha;
+    const texto=await payload();
+    const conteudo=b64(enc.encode(texto));
     const r=await api('PUT',{message:acao,content:conteudo,sha:sha||undefined,branch:cfg.branch||'main'});
-    if(!r.ok){ const e=await r.json(); msg(msgEl,'Erro GitHub: '+(e.message||r.status),'err'); return false; }
+    if(!r.ok){ const e=await r.json().catch(()=>({})); msg(msgEl,'Erro GitHub: '+(e.message||r.status),'err'); return false; }
     sha=(await r.json()).content.sha;
-    msg(msgEl,'✓ Publicado no GitHub','ok'); return true;
+    msg(msgEl,'✓ Publicado no GitHub','ok');
+    setTimeout(()=>{ if(msgEl.textContent.startsWith('✓')) msgEl.textContent=''; },5000);
+    return true;
   }catch(e){ msg(msgEl,'Falha de rede: '+e.message,'err'); return false; }
 }
-function msg(el,t,cls){ el.className=cls; el.textContent=t; setTimeout(()=>{if(el.textContent===t)el.textContent=''},6000); }
 
-/* ---------- mapa ---------- */
+/* ================= mapa ================= */
 function desenhaMapa(){
   const s=$('#svgmap');
   s.setAttribute('viewBox',`0 0 ${VBW} ${MAPA.height}`);
@@ -255,20 +387,17 @@ function desenhaMapa(){
   h+='</g><g id="gLbl">';
   for(const uf in MAPA.labels){
     const c=MAPA.labels[uf], f=FORA[uf];
-    if(f){ h+=`<line class="lead" x1="${c[0]}" y1="${c[1]}" x2="${f[0]-11}" y2="${f[1]}"/><text class="uflbl" x="${f[0]}" y="${f[1]}">${uf}</text>`; }
-    else h+=`<text class="uflbl" x="${c[0]}" y="${c[1]}">${uf}</text>`;
+    if(f) h+=`<line class="lead" x1="${c[0]}" y1="${c[1]}" x2="${f[0]-11}" y2="${f[1]}"/><text class="uflbl" x="${f[0]}" y="${f[1]}">${uf}</text>`;
+    else  h+=`<text class="uflbl" x="${c[0]}" y="${c[1]}">${uf}</text>`;
   }
   h+='</g><g id="gPt"></g>';
   s.innerHTML=h;
-
   s.querySelectorAll('.uf').forEach(p=>p.addEventListener('click',e=>{
-    const uf=e.target.dataset.uf;
-    ufSel = ufSel===uf ? '' : uf;
-    $('#fUf').value=ufSel; render();
+    const uf=(e.target.dataset&&e.target.dataset.uf)||(e.target.parentNode&&e.target.parentNode.dataset.uf);
+    if(!uf)return; ufSel = ufSel===uf ? '' : uf; $('#fUf').value=ufSel; render();
   }));
   zoomPan(s);
 }
-
 function desenhaPontos(){
   const g=$('#gPt'); const grupos={};
   DADOS.forEach(e=>{ const k=e.uf+'|'+e.cidade; (grupos[k]=grupos[k]||[]).push(e); });
@@ -278,15 +407,15 @@ function desenhaPontos(){
     arr.forEach((e,i)=>{
       let [x,y]=proj(e.lat,e.lon);
       if(arr.length>1){ const a=i/arr.length*Math.PI*2, r=3+arr.length*0.5; x+=Math.cos(a)*r; y+=Math.sin(a)*r; }
-      e._x=x; e._y=y;
       h+=`<circle class="pt${destaque===e.id?' hl':''}" data-id="${e.id}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.2" fill="${CORES[e.tipo]||'#aaa'}"/>`;
     });
   }
   g.innerHTML=h;
   g.querySelectorAll('.pt').forEach(c=>{
     c.addEventListener('mouseenter',ev=>{
-      const e=DADOS.find(d=>d.id===c.dataset.id); const w=$('#mapwrap').getBoundingClientRect();
-      const t=$('#tip'); t.style.display='block';
+      const e=DADOS.find(d=>d.id===c.dataset.id); if(!e)return;
+      const w=$('#mapwrap').getBoundingClientRect(), t=$('#tip');
+      t.style.display='block';
       t.innerHTML=`<b>${esc(e.nome)}</b><br>${esc(e.cidade)} – ${e.uf}<br>${esc(e.telefone)}<br><span style="color:${CORES[e.tipo]}">${ROTULO[e.tipo]}</span>`;
       t.style.left=Math.min(ev.clientX-w.left+12,w.width-270)+'px'; t.style.top=(ev.clientY-w.top+12)+'px';
     });
@@ -295,13 +424,12 @@ function desenhaPontos(){
       const el=document.getElementById('card-'+destaque); if(el) el.scrollIntoView({block:'center',behavior:'smooth'}); });
   });
 }
-
 function zoomPan(svg){
-  let vb=[0,0,VBW,MAPA.height], base=vb.slice(), drag=null;
+  let vb=[0,0,VBW,MAPA.height]; const base=vb.slice(); let drag=null;
   const set=()=>svg.setAttribute('viewBox',vb.join(' '));
   const zoom=(f,cx,cy)=>{
     const nw=Math.min(base[2],Math.max(base[2]/14,vb[2]*f)), nh=nw*base[3]/base[2];
-    vb[0]+= (cx-vb[0])*(1-nw/vb[2]); vb[1]+=(cy-vb[1])*(1-nh/vb[3]); vb[2]=nw; vb[3]=nh; set();
+    vb[0]+=(cx-vb[0])*(1-nw/vb[2]); vb[1]+=(cy-vb[1])*(1-nh/vb[3]); vb[2]=nw; vb[3]=nh; set();
   };
   const pt=e=>{const r=svg.getBoundingClientRect();return [vb[0]+(e.clientX-r.left)/r.width*vb[2], vb[1]+(e.clientY-r.top)/r.height*vb[3]];};
   svg.addEventListener('wheel',e=>{e.preventDefault();const[cx,cy]=pt(e);zoom(e.deltaY>0?1.15:0.87,cx,cy)},{passive:false});
@@ -314,11 +442,12 @@ function zoomPan(svg){
   $('#zreset').onclick=()=>{vb=base.slice();set()};
 }
 
-/* ---------- UI ---------- */
+/* ================= UI ================= */
 function montaSelects(){
   const ufs=Object.keys(MAPA.nomes).sort();
-  $('#fUf').innerHTML='<option value="">Todos os estados</option>'+ufs.map(u=>`<option value="${u}">${u} – ${esc(MAPA.nomes[u])}</option>`).join('');
-  $('#aUf').innerHTML='<option value="">— selecione —</option>'+ufs.map(u=>`<option value="${u}">${u} – ${esc(MAPA.nomes[u])}</option>`).join('');
+  const opts=ufs.map(u=>`<option value="${u}">${u} – ${esc(MAPA.nomes[u])}</option>`).join('');
+  $('#fUf').innerHTML='<option value="">Todos os estados</option>'+opts;
+  $('#aUf').innerHTML='<option value="">— selecione —</option>'+opts;
   $('#aUf').onchange=()=>{
     const uf=$('#aUf').value; $('#aCidade').value='';
     $('#dlCidades').innerHTML=(CIDADES.cidades[uf]||[]).map(c=>`<option value="${esc(c[0])}">`).join('');
@@ -328,6 +457,7 @@ function montaSelects(){
 }
 
 function render(){
+  if(!pronto) return;
   $('#cnt').textContent=DADOS.length+(DADOS.length===1?' empresa':' empresas');
   document.querySelectorAll('.uf').forEach(p=>{
     p.classList.toggle('sel',p.dataset.uf===ufSel);
@@ -341,12 +471,11 @@ function render(){
   $('#lista').innerHTML = lst.length ? lst.map(e=>`
     <div class="card" id="card-${e.id}" data-id="${e.id}" style="${destaque===e.id?'border-color:var(--acc)':''}">
       <div class="n"><i style="background:${CORES[e.tipo]}"></i>${esc(e.nome)}</div>
-      <div class="m"><span>${esc(e.cidade)} – ${e.uf}</span><a href="tel:${esc(e.telefone.replace(/\D/g,''))}">${esc(e.telefone)}</a></div>
+      <div class="m"><span>${esc(e.cidade)} – ${e.uf}</span><a href="tel:${esc(String(e.telefone).replace(/\D/g,''))}">${esc(e.telefone)}</a></div>
       <div class="m"><span style="color:${CORES[e.tipo]}">${ROTULO[e.tipo]}</span><button class="danger rm" data-id="${e.id}" style="padding:2px 8px;font-size:11px">remover</button></div>
     </div>`).join('') : `<div class="empty">Nenhuma empresa encontrada.<br>Use a aba <b>Adicionar</b>.</div>`;
   $('#lista').querySelectorAll('.card').forEach(c=>c.onclick=ev=>{
-    if(ev.target.classList.contains('rm'))return;
-    destaque=c.dataset.id; render();
+    if(ev.target.classList.contains('rm'))return; destaque=c.dataset.id; render();
   });
   $('#lista').querySelectorAll('.rm').forEach(b=>b.onclick=async ev=>{
     ev.stopPropagation();
@@ -359,20 +488,18 @@ function render(){
 
 $('#btnSalvar').onclick=async()=>{
   const uf=$('#aUf').value, cid=$('#aCidade').value.trim(), nome=$('#aNome').value.trim(),
-        tel=$('#aTel').value.trim(), tipo=$('#aTipo').value;
-  const M=$('#msg');
+        tel=$('#aTel').value.trim(), tipo=$('#aTipo').value, M=$('#msg');
   if(!uf) return msg(M,'Selecione o estado.','err');
   if(!nome) return msg(M,'Informe o nome da empresa.','err');
   if(!tel) return msg(M,'Informe o telefone.','err');
-  const lista=CIDADES.cidades[uf]||[];
-  const c=lista.find(x=>norm(x[0])===norm(cid));
+  const c=(CIDADES.cidades[uf]||[]).find(x=>norm(x[0])===norm(cid));
   if(!c) return msg(M,'Cidade não encontrada em '+uf+'. Escolha uma da lista.','err');
   DADOS.push({id:uid(),nome,telefone:tel,tipo,uf,cidade:c[0],lat:c[1],lon:c[2],criadoEm:new Date().toISOString().slice(0,10)});
   $('#aNome').value=''; $('#aTel').value='';
   render();
   await persiste(M,`add: ${nome} (${c[0]}-${uf})`);
 };
-$('#btnLimpar').onclick=()=>{['aCidade','aNome','aTel'].forEach(i=>$('#'+i).value='');};
+$('#btnLimpar').onclick=()=>['aCidade','aNome','aTel'].forEach(i=>$('#'+i).value='');
 
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
@@ -380,6 +507,7 @@ document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
 });
 $('#btnAdmin').onclick=()=>document.querySelector('.tabs button[data-t=cfg]').click();
 
+/* ================= config ================= */
 function preencheCfg(){
   const m=location.hostname.match(/^([^.]+)\.github\.io$/);
   const rp=location.pathname.split('/').filter(Boolean)[0];
@@ -387,30 +515,83 @@ function preencheCfg(){
   $('#cRepo').value=cfg.repo||(m&&rp?rp:'');
   $('#cBranch').value=cfg.branch||'main';
   $('#cPath').value=cfg.path||'empresas.json';
-  $('#cToken').value=cfg.token||'';
+  if(!localStorage.getItem(LS_TOK)) $('#cToken').placeholder='github_pat_…';
 }
-$('#btnCfgSave').onclick=async()=>{
-  cfg={owner:$('#cOwner').value.trim(),repo:$('#cRepo').value.trim(),branch:$('#cBranch').value.trim()||'main',
-       path:$('#cPath').value.trim()||'empresas.json',token:$('#cToken').value.trim()};
-  salvaCfg();
-  const r=await api('GET');
-  const el=$('#cfgMsg');
-  if(r.ok){ el.className='ok'; el.textContent='✓ Conectado ao repositório.'; await carregaDados(); render(); }
-  else { el.className='err'; el.textContent='Não foi possível acessar ('+r.status+'). Verifique usuário/repo/token.'; }
+$('#btnRepoSave').onclick=async()=>{
+  cfg.owner=$('#cOwner').value.trim(); cfg.repo=$('#cRepo').value.trim();
+  cfg.branch=$('#cBranch').value.trim()||'main'; cfg.path=$('#cPath').value.trim()||'empresas.json';
+  salvaCfg(); msg($('#admMsg'),'Repositório salvo. Recarregando…','ok');
+  setTimeout(()=>location.reload(),700);
 };
-$('#btnCfgClear').onclick=()=>{ cfg={}; localStorage.removeItem(LS); preencheCfg(); $('#cfgMsg').textContent='Configuração apagada.'; };
+
+function admUI(open){
+  $('#admLocked').style.display=open?'none':'';
+  $('#admOpen').style.display=open?'':'none';
+}
+$('#btnAdmUnlock').onclick=async()=>{
+  const pwd=$('#cAdmPwd').value, tok=$('#cToken').value.trim(), M=$('#admMsg');
+  if(pwd.length<8) return msg(M,'A senha de admin precisa de pelo menos 8 caracteres.','err');
+  const salvo=localStorage.getItem(LS_TOK);
+  try{
+    if(tok){
+      const kdf=novoKdf(); const key=await kdfKey(pwd,kdf); const p=await cifra(tok,key);
+      localStorage.setItem(LS_TOK,JSON.stringify({kdf,iv:p.iv,ct:p.ct}));
+      TOKEN=tok;
+    }else if(salvo){
+      const o=JSON.parse(salvo); const key=await kdfKey(pwd,o.kdf);
+      TOKEN=await decifra(o,key);
+    }else{
+      return msg(M,'Nenhum token salvo. Cole o token do GitHub.','err');
+    }
+  }catch(e){ return msg(M,'Senha de admin incorreta.','err'); }
+  $('#cAdmPwd').value=''; $('#cToken').value='';
+  const r=await api('GET');
+  if(!r.ok){ TOKEN=null; return msg(M,'Token recusado pelo GitHub ('+r.status+'). Confira o repositório e as permissões.','err'); }
+  sha=(await r.json()).sha;
+  admUI(true); msg(M,'','');
+};
+$('#btnAdmLock').onclick=()=>{ TOKEN=null; admUI(false); msg($('#admMsg'),'Admin travado.',''); };
+$('#btnAdmForget').onclick=()=>{
+  if(!confirm('Apagar o token salvo neste navegador?'))return;
+  localStorage.removeItem(LS_TOK); TOKEN=null; admUI(false);
+  msg($('#admMsg'),'Token apagado deste navegador.','');
+};
+
+$('#btnAccSet').onclick=async()=>{
+  const p1=$('#cAccPwd').value, p2=$('#cAccPwd2').value, M=$('#accMsg');
+  if(p1.length<10) return msg(M,'Use pelo menos 10 caracteres.','err');
+  if(p1!==p2) return msg(M,'As senhas não conferem.','err');
+  if(!TOKEN) return msg(M,'Destrave o modo admin antes (bloco 2).','err');
+  msg(M,'Criptografando…','');
+  DKDF=novoKdf(); DKEY=await kdfKey(p1,DKDF);
+  const ok=await persiste(M,'seguranca: ativa criptografia da lista');
+  if(ok){ localStorage.removeItem(LS_CACHE);
+    $('#cAccPwd').value=''; $('#cAccPwd2').value='';
+    msg(M,'✓ Lista criptografada. Guarde a senha — sem ela os dados não voltam.','ok');
+    finaliza();
+  }
+};
+$('#btnAccOff').onclick=async()=>{
+  const M=$('#accMsg');
+  if(!TOKEN) return msg(M,'Destrave o modo admin antes (bloco 2).','err');
+  if(!confirm('Remover a criptografia? A lista ficará legível para qualquer pessoa.'))return;
+  DKEY=null; DKDF=null;
+  if(await persiste(M,'seguranca: remove criptografia da lista')){ msg(M,'Criptografia removida.',''); finaliza(); }
+};
+
 $('#btnExport').onclick=()=>{
   const b=new Blob([JSON.stringify(DADOS,null,1)],{type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='empresas.json'; a.click();
+  const a=document.createElement('a'); a.href=URL.createObjectURL(b);
+  a.download='empresas-backup.json'; a.click();
 };
 $('#fImport').onchange=async e=>{
-  const f=e.target.files[0]; if(!f)return;
+  const f=e.target.files[0]; if(!f)return; const M=$('#impMsg');
   try{
     const arr=JSON.parse(await f.text());
-    if(!Array.isArray(arr)) throw new Error('formato inválido');
+    if(!Array.isArray(arr)) throw new Error('o arquivo precisa ser uma lista');
     arr.forEach(x=>{ if(!x.id)x.id=uid(); });
-    DADOS=arr; render(); await persiste($('#cfgMsg'),'import: '+f.name);
-  }catch(err){ $('#cfgMsg').className='err'; $('#cfgMsg').textContent='Erro ao importar: '+err.message; }
+    DADOS=arr; render(); await persiste(M,'import: '+f.name);
+  }catch(err){ msg(M,'Erro ao importar: '+err.message,'err'); }
 };
 
 boot();
