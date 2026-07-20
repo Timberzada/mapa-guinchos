@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mapa de Guinchos & Para-brisas</title>
+<style>
+:root{
+  --bg:#0f1216; --panel:#171b21; --panel2:#1e242c; --line:#2a323c;
+  --txt:#e6eaf0; --mut:#8d99a8; --acc:#ffb020; --acc2:#3b9dff;
+  --guincho:#ffb020; --parabrisa:#3b9dff; --ambos:#31d07a; --map:#232b34; --mapH:#33404d;
+}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt)}
+header{display:flex;align-items:center;gap:14px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header h1{font-size:16px;margin:0;font-weight:650;letter-spacing:.2px}
+header .sp{flex:1}
+button,select,input{font:inherit;color:var(--txt);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;outline:none}
+button{cursor:pointer}
+button:hover{border-color:#3d4854}
+button.primary{background:var(--acc);color:#1a1206;border-color:var(--acc);font-weight:650}
+button.danger{background:#3a1e1e;border-color:#5b2a2a;color:#ff9a9a}
+.badge{font-size:11px;padding:2px 7px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);color:var(--mut)}
+main{display:grid;grid-template-columns:1fr 380px;height:calc(100vh - 53px)}
+@media(max-width:900px){main{grid-template-columns:1fr;height:auto}}
+#mapwrap{position:relative;overflow:hidden;background:radial-gradient(circle at 50% 40%,#141920,#0d1014)}
+#svgmap{width:100%;height:100%;display:block;cursor:grab}
+#svgmap.drag{cursor:grabbing}
+.uf{fill:var(--map);stroke:#0f1216;stroke-width:1.1;transition:fill .12s}
+.uf:hover{fill:var(--mapH)}
+.uf.sel{fill:#3a4a5c}
+.uf.has{fill:#2c3742}
+.uflbl{fill:#93a2b2;font-size:13px;font-weight:700;pointer-events:none;text-anchor:middle;dominant-baseline:middle}
+.lead{stroke:#4a5866;stroke-width:1}
+.pt{stroke:#0f1216;stroke-width:1.2;cursor:pointer}
+.pt:hover{stroke:#fff;stroke-width:2}
+.pt.hl{stroke:#fff;stroke-width:2.5}
+#tip{position:absolute;pointer-events:none;background:#0b0e12ee;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;display:none;max-width:260px;z-index:5;box-shadow:0 6px 20px #0008}
+#tip b{color:var(--acc)}
+#zoomui{position:absolute;left:12px;bottom:12px;display:flex;flex-direction:column;gap:6px}
+#zoomui button{width:34px;height:34px;padding:0;font-size:16px}
+#legend{position:absolute;right:12px;bottom:12px;background:#0b0e12cc;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px}
+#legend div{display:flex;align-items:center;gap:7px;margin:3px 0;color:var(--mut)}
+#legend i{width:10px;height:10px;border-radius:99px;display:inline-block}
+aside{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;border:0;border-radius:0;background:transparent;color:var(--mut);padding:11px}
+.tabs button.on{color:var(--txt);box-shadow:inset 0 -2px 0 var(--acc)}
+.pane{display:none;padding:12px;overflow:auto;flex:1}
+.pane.on{display:block}
+label{display:block;font-size:12px;color:var(--mut);margin:10px 0 4px}
+.f{width:100%}
+.row{display:flex;gap:8px}
+.row>*{flex:1;min-width:0}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;cursor:pointer}
+.card:hover{border-color:#3d4854}
+.card .n{font-weight:650;display:flex;align-items:center;gap:6px}
+.card .n i{width:9px;height:9px;border-radius:99px;flex:0 0 auto}
+.card .m{color:var(--mut);font-size:12px;margin-top:3px;display:flex;justify-content:space-between;gap:8px}
+.card a{color:var(--acc2);text-decoration:none}
+.empty{color:var(--mut);text-align:center;padding:30px 10px;font-size:13px}
+.hint{color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.5}
+.ok{color:#31d07a}.err{color:#ff8080}
+#msg{font-size:12px;margin-top:10px;min-height:16px}
+hr{border:0;border-top:1px solid var(--line);margin:16px 0}
+code{background:#0b0e12;padding:1px 5px;border-radius:4px;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🚨 Mapa de Guinchos &amp; Para-brisas</h1>
+  <span class="badge" id="cnt">0 empresas</span>
+  <span class="badge" id="src">carregando…</span>
+  <span class="sp"></span>
+  <button id="btnExport">Exportar JSON</button>
+  <button id="btnAdmin">🔑 Admin</button>
+</header>
+
+<main>
+  <div id="mapwrap">
+    <svg id="svgmap"></svg>
+    <div id="tip"></div>
+    <div id="zoomui">
+      <button id="zin" title="Aproximar">+</button>
+      <button id="zout" title="Afastar">−</button>
+      <button id="zreset" title="Resetar" style="font-size:13px">⟲</button>
+    </div>
+    <div id="legend">
+      <div><i style="background:var(--guincho)"></i>Guincho</div>
+      <div><i style="background:var(--parabrisa)"></i>Para-brisa</div>
+      <div><i style="background:var(--ambos)"></i>Ambos</div>
+    </div>
+  </div>
+
+  <aside>
+    <div class="tabs">
+      <button class="on" data-t="lista">Lista</button>
+      <button data-t="add">Adicionar</button>
+      <button data-t="cfg">Config</button>
+    </div>
+
+    <div class="pane on" id="p-lista">
+      <input class="f" id="q" placeholder="Buscar empresa, cidade ou telefone…">
+      <div class="row" style="margin-top:8px">
+        <select id="fUf"><option value="">Todos os estados</option></select>
+        <select id="fTipo">
+          <option value="">Todos os tipos</option>
+          <option value="guincho">Guincho</option>
+          <option value="parabrisa">Para-brisa</option>
+          <option value="ambos">Ambos</option>
+        </select>
+      </div>
+      <div id="lista" style="margin-top:12px"></div>
+    </div>
+
+    <div class="pane" id="p-add">
+      <label>Estado (UF)</label>
+      <select class="f" id="aUf"></select>
+      <label>Cidade</label>
+      <input class="f" id="aCidade" list="dlCidades" placeholder="Digite para buscar…" autocomplete="off">
+      <datalist id="dlCidades"></datalist>
+      <label>Nome da empresa</label>
+      <input class="f" id="aNome" placeholder="Ex.: Guincho Rápido 24h">
+      <label>Telefone</label>
+      <input class="f" id="aTel" placeholder="(11) 91234-5678">
+      <label>Tipo de serviço</label>
+      <select class="f" id="aTipo">
+        <option value="guincho">Guincho</option>
+        <option value="parabrisa">Para-brisa</option>
+        <option value="ambos">Ambos</option>
+      </select>
+      <div style="margin-top:14px" class="row">
+        <button class="primary" id="btnSalvar">Adicionar empresa</button>
+        <button id="btnLimpar" style="flex:0 0 auto">Limpar</button>
+      </div>
+      <div id="msg"></div>
+      <div class="hint">A cidade define a posição exata do ponto no mapa (base IBGE + coordenadas GeoNames).</div>
+    </div>
+
+    <div class="pane" id="p-cfg">
+      <div class="hint" style="margin:0 0 8px">Para salvar de forma permanente, o site grava o arquivo <code>empresas.json</code> no seu repositório via API do GitHub. Sem token, as alterações ficam só neste navegador.</div>
+      <label>Usuário/Org do GitHub</label>
+      <input class="f" id="cOwner" placeholder="felipemees">
+      <label>Repositório</label>
+      <input class="f" id="cRepo" placeholder="mapa-guinchos">
+      <div class="row">
+        <div><label>Branch</label><input class="f" id="cBranch" placeholder="main"></div>
+        <div><label>Caminho do arquivo</label><input class="f" id="cPath" placeholder="empresas.json"></div>
+      </div>
+      <label>Token de acesso (PAT)</label>
+      <input class="f" id="cToken" type="password" placeholder="github_pat_…">
+      <div class="row" style="margin-top:14px">
+        <button class="primary" id="btnCfgSave">Salvar configuração</button>
+        <button class="danger" id="btnCfgClear" style="flex:0 0 auto">Sair</button>
+      </div>
+      <div id="cfgMsg" style="font-size:12px;margin-top:10px"></div>
+      <hr>
+      <label style="margin-top:0">Importar backup (.json)</label>
+      <input class="f" type="file" id="fImport" accept="application/json">
+      <div class="hint">
+        <b>Como criar o token:</b> GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → só o repositório do mapa, permissão <code>Contents: Read and write</code>.<br>
+        O token fica salvo apenas no seu navegador (localStorage). Nunca comite o token no repositório.
+      </div>
+    </div>
+  </aside>
+</main>
+
+<script>
+const LS='mapaGuinchos.cfg', LSD='mapaGuinchos.dados';
+const CORES={guincho:'#ffb020',parabrisa:'#3b9dff',ambos:'#31d07a'};
+const ROTULO={guincho:'Guincho',parabrisa:'Para-brisa',ambos:'Guincho + Para-brisa'};
+const FORA={RN:[965,262],PB:[965,296],PE:[965,330],AL:[965,364],SE:[965,398],ES:[930,576],RJ:[930,668],DF:[648,462]};
+const VBW=1010;
+
+let MAPA=null, CIDADES=null, DADOS=[], cfg=cargaCfg(), sha=null, remoto=false;
+let ufSel='', destaque=null;
+const $=s=>document.querySelector(s);
+
+function cargaCfg(){ try{return JSON.parse(localStorage.getItem(LS))||{}}catch(e){return {}} }
+function salvaCfg(){ localStorage.setItem(LS,JSON.stringify(cfg)); }
+function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function norm(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+/* ---------- projeção (Mercator, idêntica à usada ao gerar o mapa) ---------- */
+function proj(lat,lon){
+  const p=MAPA.proj;
+  const my=lat=>Math.log(Math.tan(Math.PI/4+lat*Math.PI/360))*180/Math.PI;
+  return [ (lon-p.minx)*p.k+p.pad, (p.maxy-my(lat))*p.k+p.pad ];
+}
+
+/* ---------- carregar ---------- */
+async function boot(){
+  [MAPA,CIDADES]=await Promise.all([
+    fetch('mapa.json').then(r=>r.json()),
+    fetch('cidades.json').then(r=>r.json())
+  ]);
+  desenhaMapa(); montaSelects(); preencheCfg();
+  await carregaDados();
+  render();
+}
+
+async function carregaDados(){
+  if(cfg.owner&&cfg.repo){
+    try{
+      const r=await api('GET');
+      if(r.ok){
+        const j=await r.json(); sha=j.sha;
+        DADOS=JSON.parse(decodeURIComponent(escape(atob(j.content.replace(/\n/g,'')))));
+        remoto=true; $('#src').textContent='GitHub · '+cfg.repo; $('#src').style.color='#31d07a';
+        localStorage.setItem(LSD,JSON.stringify(DADOS)); return;
+      }
+    }catch(e){}
+  }
+  try{
+    const r=await fetch('empresas.json',{cache:'no-store'});
+    if(r.ok){ DADOS=await r.json(); remoto=false; $('#src').textContent='arquivo local'; return; }
+  }catch(e){}
+  DADOS=JSON.parse(localStorage.getItem(LSD)||'[]');
+  $('#src').textContent='só neste navegador';
+}
+
+function api(method,body){
+  const url=`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${cfg.path||'empresas.json'}`
+          + (method==='GET'?`?ref=${cfg.branch||'main'}&t=${Date.now()}`:'');
+  const h={'Accept':'application/vnd.github+json'};
+  if(cfg.token) h['Authorization']='Bearer '+cfg.token;
+  if(body) h['Content-Type']='application/json';
+  return fetch(url,{method,headers:h,body:body?JSON.stringify(body):undefined});
+}
+
+async function persiste(msgEl,acao){
+  localStorage.setItem(LSD,JSON.stringify(DADOS));
+  if(!cfg.token||!cfg.owner||!cfg.repo){
+    msg(msgEl,'Salvo neste navegador. Configure o token do GitHub para publicar no site.','');
+    return true;
+  }
+  try{
+    const g=await api('GET'); if(g.ok){ sha=(await g.json()).sha; }
+    const conteudo=btoa(unescape(encodeURIComponent(JSON.stringify(DADOS,null,1))));
+    const r=await api('PUT',{message:acao,content:conteudo,sha:sha||undefined,branch:cfg.branch||'main'});
+    if(!r.ok){ const e=await r.json(); msg(msgEl,'Erro GitHub: '+(e.message||r.status),'err'); return false; }
+    sha=(await r.json()).content.sha;
+    msg(msgEl,'✓ Publicado no GitHub','ok'); return true;
+  }catch(e){ msg(msgEl,'Falha de rede: '+e.message,'err'); return false; }
+}
+function msg(el,t,cls){ el.className=cls; el.textContent=t; setTimeout(()=>{if(el.textContent===t)el.textContent=''},6000); }
+
+/* ---------- mapa ---------- */
+function desenhaMapa(){
+  const s=$('#svgmap');
+  s.setAttribute('viewBox',`0 0 ${VBW} ${MAPA.height}`);
+  let h='<g id="gUf">';
+  for(const uf in MAPA.paths) h+=`<path class="uf" id="uf-${uf}" data-uf="${uf}" d="${MAPA.paths[uf]}"><title>${esc(MAPA.nomes[uf])}</title></path>`;
+  h+='</g><g id="gLbl">';
+  for(const uf in MAPA.labels){
+    const c=MAPA.labels[uf], f=FORA[uf];
+    if(f){ h+=`<line class="lead" x1="${c[0]}" y1="${c[1]}" x2="${f[0]-11}" y2="${f[1]}"/><text class="uflbl" x="${f[0]}" y="${f[1]}">${uf}</text>`; }
+    else h+=`<text class="uflbl" x="${c[0]}" y="${c[1]}">${uf}</text>`;
+  }
+  h+='</g><g id="gPt"></g>';
+  s.innerHTML=h;
+
+  s.querySelectorAll('.uf').forEach(p=>p.addEventListener('click',e=>{
+    const uf=e.target.dataset.uf;
+    ufSel = ufSel===uf ? '' : uf;
+    $('#fUf').value=ufSel; render();
+  }));
+  zoomPan(s);
+}
+
+function desenhaPontos(){
+  const g=$('#gPt'); const grupos={};
+  DADOS.forEach(e=>{ const k=e.uf+'|'+e.cidade; (grupos[k]=grupos[k]||[]).push(e); });
+  let h='';
+  for(const k in grupos){
+    const arr=grupos[k];
+    arr.forEach((e,i)=>{
+      let [x,y]=proj(e.lat,e.lon);
+      if(arr.length>1){ const a=i/arr.length*Math.PI*2, r=3+arr.length*0.5; x+=Math.cos(a)*r; y+=Math.sin(a)*r; }
+      e._x=x; e._y=y;
+      h+=`<circle class="pt${destaque===e.id?' hl':''}" data-id="${e.id}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.2" fill="${CORES[e.tipo]||'#aaa'}"/>`;
+    });
+  }
+  g.innerHTML=h;
+  g.querySelectorAll('.pt').forEach(c=>{
+    c.addEventListener('mouseenter',ev=>{
+      const e=DADOS.find(d=>d.id===c.dataset.id); const w=$('#mapwrap').getBoundingClientRect();
+      const t=$('#tip'); t.style.display='block';
+      t.innerHTML=`<b>${esc(e.nome)}</b><br>${esc(e.cidade)} – ${e.uf}<br>${esc(e.telefone)}<br><span style="color:${CORES[e.tipo]}">${ROTULO[e.tipo]}</span>`;
+      t.style.left=Math.min(ev.clientX-w.left+12,w.width-270)+'px'; t.style.top=(ev.clientY-w.top+12)+'px';
+    });
+    c.addEventListener('mouseleave',()=>$('#tip').style.display='none');
+    c.addEventListener('click',()=>{ destaque=c.dataset.id; render();
+      const el=document.getElementById('card-'+destaque); if(el) el.scrollIntoView({block:'center',behavior:'smooth'}); });
+  });
+}
+
+function zoomPan(svg){
+  let vb=[0,0,VBW,MAPA.height], base=vb.slice(), drag=null;
+  const set=()=>svg.setAttribute('viewBox',vb.join(' '));
+  const zoom=(f,cx,cy)=>{
+    const nw=Math.min(base[2],Math.max(base[2]/14,vb[2]*f)), nh=nw*base[3]/base[2];
+    vb[0]+= (cx-vb[0])*(1-nw/vb[2]); vb[1]+=(cy-vb[1])*(1-nh/vb[3]); vb[2]=nw; vb[3]=nh; set();
+  };
+  const pt=e=>{const r=svg.getBoundingClientRect();return [vb[0]+(e.clientX-r.left)/r.width*vb[2], vb[1]+(e.clientY-r.top)/r.height*vb[3]];};
+  svg.addEventListener('wheel',e=>{e.preventDefault();const[cx,cy]=pt(e);zoom(e.deltaY>0?1.15:0.87,cx,cy)},{passive:false});
+  svg.addEventListener('mousedown',e=>{drag=[e.clientX,e.clientY,vb[0],vb[1]];svg.classList.add('drag')});
+  addEventListener('mousemove',e=>{ if(!drag)return; const r=svg.getBoundingClientRect();
+    vb[0]=drag[2]-(e.clientX-drag[0])/r.width*vb[2]; vb[1]=drag[3]-(e.clientY-drag[1])/r.height*vb[3]; set(); });
+  addEventListener('mouseup',()=>{drag=null;svg.classList.remove('drag')});
+  $('#zin').onclick=()=>zoom(0.75,vb[0]+vb[2]/2,vb[1]+vb[3]/2);
+  $('#zout').onclick=()=>zoom(1.33,vb[0]+vb[2]/2,vb[1]+vb[3]/2);
+  $('#zreset').onclick=()=>{vb=base.slice();set()};
+}
+
+/* ---------- UI ---------- */
+function montaSelects(){
+  const ufs=Object.keys(MAPA.nomes).sort();
+  $('#fUf').innerHTML='<option value="">Todos os estados</option>'+ufs.map(u=>`<option value="${u}">${u} – ${esc(MAPA.nomes[u])}</option>`).join('');
+  $('#aUf').innerHTML='<option value="">— selecione —</option>'+ufs.map(u=>`<option value="${u}">${u} – ${esc(MAPA.nomes[u])}</option>`).join('');
+  $('#aUf').onchange=()=>{
+    const uf=$('#aUf').value; $('#aCidade').value='';
+    $('#dlCidades').innerHTML=(CIDADES.cidades[uf]||[]).map(c=>`<option value="${esc(c[0])}">`).join('');
+  };
+  $('#fUf').onchange=()=>{ufSel=$('#fUf').value;render()};
+  $('#fTipo').onchange=render; $('#q').oninput=render;
+}
+
+function render(){
+  $('#cnt').textContent=DADOS.length+(DADOS.length===1?' empresa':' empresas');
+  document.querySelectorAll('.uf').forEach(p=>{
+    p.classList.toggle('sel',p.dataset.uf===ufSel);
+    p.classList.toggle('has',DADOS.some(d=>d.uf===p.dataset.uf));
+  });
+  desenhaPontos();
+  const q=norm($('#q').value), t=$('#fTipo').value;
+  const lst=DADOS.filter(e=>(!ufSel||e.uf===ufSel)&&(!t||e.tipo===t)&&
+    (!q||norm(e.nome+' '+e.cidade+' '+e.telefone+' '+e.uf).includes(q)))
+    .sort((a,b)=>a.uf.localeCompare(b.uf)||a.cidade.localeCompare(b.cidade)||a.nome.localeCompare(b.nome));
+  $('#lista').innerHTML = lst.length ? lst.map(e=>`
+    <div class="card" id="card-${e.id}" data-id="${e.id}" style="${destaque===e.id?'border-color:var(--acc)':''}">
+      <div class="n"><i style="background:${CORES[e.tipo]}"></i>${esc(e.nome)}</div>
+      <div class="m"><span>${esc(e.cidade)} – ${e.uf}</span><a href="tel:${esc(e.telefone.replace(/\D/g,''))}">${esc(e.telefone)}</a></div>
+      <div class="m"><span style="color:${CORES[e.tipo]}">${ROTULO[e.tipo]}</span><button class="danger rm" data-id="${e.id}" style="padding:2px 8px;font-size:11px">remover</button></div>
+    </div>`).join('') : `<div class="empty">Nenhuma empresa encontrada.<br>Use a aba <b>Adicionar</b>.</div>`;
+  $('#lista').querySelectorAll('.card').forEach(c=>c.onclick=ev=>{
+    if(ev.target.classList.contains('rm'))return;
+    destaque=c.dataset.id; render();
+  });
+  $('#lista').querySelectorAll('.rm').forEach(b=>b.onclick=async ev=>{
+    ev.stopPropagation();
+    const e=DADOS.find(d=>d.id===b.dataset.id);
+    if(!confirm(`Remover "${e.nome}" (${e.cidade}-${e.uf})?`))return;
+    DADOS=DADOS.filter(d=>d.id!==e.id); render();
+    await persiste($('#msg'),`remove: ${e.nome} (${e.cidade}-${e.uf})`);
+  });
+}
+
+$('#btnSalvar').onclick=async()=>{
+  const uf=$('#aUf').value, cid=$('#aCidade').value.trim(), nome=$('#aNome').value.trim(),
+        tel=$('#aTel').value.trim(), tipo=$('#aTipo').value;
+  const M=$('#msg');
+  if(!uf) return msg(M,'Selecione o estado.','err');
+  if(!nome) return msg(M,'Informe o nome da empresa.','err');
+  if(!tel) return msg(M,'Informe o telefone.','err');
+  const lista=CIDADES.cidades[uf]||[];
+  const c=lista.find(x=>norm(x[0])===norm(cid));
+  if(!c) return msg(M,'Cidade não encontrada em '+uf+'. Escolha uma da lista.','err');
+  DADOS.push({id:uid(),nome,telefone:tel,tipo,uf,cidade:c[0],lat:c[1],lon:c[2],criadoEm:new Date().toISOString().slice(0,10)});
+  $('#aNome').value=''; $('#aTel').value='';
+  render();
+  await persiste(M,`add: ${nome} (${c[0]}-${uf})`);
+};
+$('#btnLimpar').onclick=()=>{['aCidade','aNome','aTel'].forEach(i=>$('#'+i).value='');};
+
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='p-'+b.dataset.t));
+});
+$('#btnAdmin').onclick=()=>document.querySelector('.tabs button[data-t=cfg]').click();
+
+function preencheCfg(){
+  const m=location.hostname.match(/^([^.]+)\.github\.io$/);
+  const rp=location.pathname.split('/').filter(Boolean)[0];
+  $('#cOwner').value=cfg.owner||(m?m[1]:'');
+  $('#cRepo').value=cfg.repo||(m&&rp?rp:'');
+  $('#cBranch').value=cfg.branch||'main';
+  $('#cPath').value=cfg.path||'empresas.json';
+  $('#cToken').value=cfg.token||'';
+}
+$('#btnCfgSave').onclick=async()=>{
+  cfg={owner:$('#cOwner').value.trim(),repo:$('#cRepo').value.trim(),branch:$('#cBranch').value.trim()||'main',
+       path:$('#cPath').value.trim()||'empresas.json',token:$('#cToken').value.trim()};
+  salvaCfg();
+  const r=await api('GET');
+  const el=$('#cfgMsg');
+  if(r.ok){ el.className='ok'; el.textContent='✓ Conectado ao repositório.'; await carregaDados(); render(); }
+  else { el.className='err'; el.textContent='Não foi possível acessar ('+r.status+'). Verifique usuário/repo/token.'; }
+};
+$('#btnCfgClear').onclick=()=>{ cfg={}; localStorage.removeItem(LS); preencheCfg(); $('#cfgMsg').textContent='Configuração apagada.'; };
+$('#btnExport').onclick=()=>{
+  const b=new Blob([JSON.stringify(DADOS,null,1)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='empresas.json'; a.click();
+};
+$('#fImport').onchange=async e=>{
+  const f=e.target.files[0]; if(!f)return;
+  try{
+    const arr=JSON.parse(await f.text());
+    if(!Array.isArray(arr)) throw new Error('formato inválido');
+    arr.forEach(x=>{ if(!x.id)x.id=uid(); });
+    DADOS=arr; render(); await persiste($('#cfgMsg'),'import: '+f.name);
+  }catch(err){ $('#cfgMsg').className='err'; $('#cfgMsg').textContent='Erro ao importar: '+err.message; }
+};
+
+boot();
+</script>
+</body>
+</html>
