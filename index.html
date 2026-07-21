@@ -84,8 +84,9 @@ h3{font-size:13px;margin:0 0 2px;letter-spacing:.3px;text-transform:uppercase;co
   <div class="g">
     <div class="lk">🔒</div>
     <h2>Mapa de Guinchos &amp; Para-brisas</h2>
-    <p>Conteúdo protegido. Informe a senha de acesso.</p>
-    <input id="gPwd" type="password" placeholder="Senha de acesso" autocomplete="current-password">
+    <p id="gTxt">Acesso restrito. Entre com seu usuário e senha.</p>
+    <input id="gUser" placeholder="Usuário" autocomplete="username">
+    <input id="gPwd" type="password" placeholder="Senha" autocomplete="current-password" style="margin-top:8px">
     <button class="primary" id="gBtn">Entrar</button>
     <div id="gateMsg"></div>
   </div>
@@ -200,15 +201,32 @@ h3{font-size:13px;margin:0 0 2px;letter-spacing:.3px;text-transform:uppercase;co
       </div>
 
       <div class="box">
-        <h3>3 · Senha de acesso</h3>
-        <div class="hint" style="margin-top:0">Criptografa a lista de empresas no repositório. Sem ela ninguém lê o arquivo, nem baixando direto do GitHub. Requer modo admin ativo.</div>
-        <label>Nova senha de acesso</label>
-        <input class="f" id="cAccPwd" type="password" placeholder="mínimo 10 caracteres" autocomplete="off">
-        <label>Repetir</label>
-        <input class="f" id="cAccPwd2" type="password" autocomplete="off">
-        <div class="row" style="margin-top:12px">
-          <button class="primary" id="btnAccSet">Aplicar senha de acesso</button>
-          <button class="danger" id="btnAccOff" style="flex:0 0 auto">Remover</button>
+        <h3>3 · Login e usuários</h3>
+
+        <div id="loginOff">
+          <div class="hint" style="margin-top:0">Ativa a tela de login e criptografa a lista no repositório. Sem login ninguém lê o arquivo, nem baixando direto do GitHub. Requer modo admin ativo.</div>
+          <label>Primeiro usuário</label>
+          <input class="f" id="cU1" placeholder="ex.: felipe" autocomplete="off">
+          <label>Senha</label>
+          <input class="f" id="cP1" type="password" placeholder="mínimo 8 caracteres" autocomplete="new-password">
+          <label>Repetir senha</label>
+          <input class="f" id="cP2" type="password" autocomplete="new-password">
+          <div style="margin-top:12px"><button class="primary" id="btnLoginOn">Ativar login</button></div>
+        </div>
+
+        <div id="loginOn" style="display:none">
+          <div class="hint" style="margin-top:0">Usuários que podem entrar no site. Remover alguém não afeta a senha dos demais.</div>
+          <div id="listaUsers" style="margin-top:10px"></div>
+          <hr>
+          <label style="margin-top:0">Novo usuário</label>
+          <div class="row">
+            <input class="f" id="cUN" placeholder="usuário" autocomplete="off">
+            <input class="f" id="cUP" type="password" placeholder="senha" autocomplete="new-password">
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button class="primary" id="btnUserAdd">Adicionar usuário</button>
+            <button class="danger" id="btnLoginOff" style="flex:0 0 auto">Desativar login</button>
+          </div>
         </div>
         <div id="accMsg" style="font-size:12px;margin-top:10px"></div>
       </div>
@@ -236,7 +254,10 @@ const FORA={RN:[965,262],PB:[965,296],PE:[965,330],AL:[965,364],SE:[965,398],ES:
 const VBW=1010, ITER=310000;
 
 let MAPA=null, CIDADES=null, DADOS=[], cfg=carregaCfg();
-let DKEY=null, DKDF=null;      // chave/params da senha de acesso (null = arquivo em texto puro)
+let DKEY=null;                 // chave AES dos dados (null = arquivo em texto puro)
+let DKRAW=null;                // chave crua, para embrulhar de novo por usuário
+let DKDF=null;                 // params do formato antigo (v1, senha única)
+let USUARIOS=[], USER=null, VER=0;
 let TOKEN=null;                // token destravado em memória
 let sha=null, ufSel='', destaque=null, pronto=false;
 const $=s=>document.querySelector(s);
@@ -261,6 +282,16 @@ async function decifra(pack,key){
 }
 function novoKdf(){ return {salt:b64(crypto.getRandomValues(new Uint8Array(16))),iter:ITER}; }
 const kdfKey=(pwd,kdf)=>derive(pwd,unb64(kdf.salt),kdf.iter);
+const importDK=raw=>crypto.subtle.importKey('raw',raw,'AES-GCM',false,['encrypt','decrypt']);
+// embrulha a chave dos dados com a senha de um usuário
+async function embrulha(usuario,pwd,rawDK){
+  const kdf=novoKdf(); const k=await kdfKey(pwd,kdf); const p=await cifra(b64(rawDK),k);
+  return {u:usuario,kdf,iv:p.iv,ct:p.ct};
+}
+async function desembrulha(rec,pwd){
+  const k=await kdfKey(pwd,rec.kdf);
+  return unb64(await decifra(rec,k));
+}
 
 /* ================= util ================= */
 function carregaCfg(){ try{return JSON.parse(localStorage.getItem(LS_CFG))||{}}catch(e){return {}} }
@@ -306,43 +337,66 @@ async function buscaArquivo(){
   return JSON.parse(localStorage.getItem(LS_CACHE)||'[]');
 }
 
+let PACK=null;
 async function carregaDados(){
   const raw=await buscaArquivo();
   if(raw && raw.cifrado){
-    DKDF=raw.kdf; window.__pack=raw;
-    $('#gate').classList.add('on'); $('#gPwd').focus();
+    PACK=raw; VER=raw.cifrado;
+    USUARIOS=raw.usuarios||[]; DKDF=raw.kdf||null;
+    const v1 = VER===1;
+    $('#gUser').style.display = v1?'none':'';
+    $('#gTxt').textContent = v1 ? 'Conteúdo protegido. Informe a senha de acesso.'
+                                : 'Acesso restrito. Entre com seu usuário e senha.';
+    const s=sessionStorage.getItem('mapaGuinchos.sess');
+    if(s){ try{ await abreSessao(unb64(s)); return; }catch(e){ sessionStorage.removeItem('mapaGuinchos.sess'); } }
+    $('#gate').classList.add('on'); (v1?$('#gPwd'):$('#gUser')).focus();
     return;
   }
   DADOS=Array.isArray(raw)?raw:[];
-  DKEY=null; DKDF=null;
+  DKEY=null; DKRAW=null; DKDF=null; USUARIOS=[]; VER=0;
+  finaliza();
+}
+
+async function abreSessao(rawDK){
+  DKRAW=rawDK; DKEY=await importDK(rawDK);
+  DADOS=await decifra(PACK,DKEY);
+  sessionStorage.setItem('mapaGuinchos.sess',b64(rawDK));
   finaliza();
 }
 
 function finaliza(){
   pronto=true;
   $('#gate').classList.remove('on');
-  const b=$('#secBadge');
-  b.style.display='';
-  b.textContent = DKEY ? '🔒 lista criptografada' : '🌐 lista pública';
+  const b=$('#secBadge'); b.style.display='';
+  b.textContent = DKEY ? (USER?'👤 '+USER:'🔒 protegido') : '🌐 lista pública';
   b.style.color = DKEY ? '#31d07a' : '#8d99a8';
   $('#btnLock').style.display = DKEY ? '' : 'none';
-  render();
+  loginUI(); render();
 }
 
 $('#gBtn').onclick=async()=>{
-  const pwd=$('#gPwd').value; const M=$('#gateMsg');
+  const u=$('#gUser').value.trim(), pwd=$('#gPwd').value, M=$('#gateMsg');
   if(!pwd) return msg(M,'Digite a senha.','err');
+  if(VER===2 && !u) return msg(M,'Digite o usuário.','err');
   msg(M,'Verificando…','');
   try{
-    const key=await kdfKey(pwd,DKDF);
-    DADOS=await decifra(window.__pack,key);
-    DKEY=key; msg(M,'','');
-    $('#gPwd').value='';
-    finaliza();
-  }catch(e){ msg(M,'Senha incorreta.','err'); }
+    if(VER===1){
+      const key=await kdfKey(pwd,DKDF);
+      DADOS=await decifra(PACK,key);
+      DKEY=key; DKRAW=null; USER=null;
+      $('#gPwd').value=''; $('#gate').classList.remove('on'); pronto=true; finaliza();
+      return;
+    }
+    const rec=USUARIOS.find(x=>norm(x.u)===norm(u));
+    if(!rec){ await kdfKey(pwd,novoKdf()); throw new Error('nope'); }  // tempo parecido, sem revelar se o usuário existe
+    const raw=await desembrulha(rec,pwd);
+    USER=rec.u;
+    $('#gUser').value=''; $('#gPwd').value=''; msg(M,'','');
+    await abreSessao(raw);
+  }catch(e){ USER=null; msg(M,'Usuário ou senha incorretos.','err'); }
 };
-$('#gPwd').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#gBtn').click(); });
-$('#btnLock').onclick=()=>{ DKEY=null; TOKEN=null; DADOS=[]; location.reload(); };
+['gUser','gPwd'].forEach(id=>$('#'+id).addEventListener('keydown',e=>{ if(e.key==='Enter') $('#gBtn').click(); }));
+$('#btnLock').onclick=()=>{ sessionStorage.removeItem('mapaGuinchos.sess'); DKEY=DKRAW=TOKEN=null; DADOS=[]; location.reload(); };
 
 /* ================= GitHub ================= */
 function api(method,body){
@@ -357,7 +411,8 @@ function api(method,body){
 async function payload(){
   if(!DKEY) return JSON.stringify(DADOS,null,1);
   const p=await cifra(DADOS,DKEY);
-  return JSON.stringify({cifrado:1,kdf:DKDF,iv:p.iv,ct:p.ct});
+  if(VER===1) return JSON.stringify({cifrado:1,kdf:DKDF,iv:p.iv,ct:p.ct});
+  return JSON.stringify({cifrado:2,usuarios:USUARIOS,iv:p.iv,ct:p.ct});
 }
 async function persiste(msgEl,acao){
   if(!DKEY) localStorage.setItem(LS_CACHE,JSON.stringify(DADOS));
@@ -557,26 +612,98 @@ $('#btnAdmForget').onclick=()=>{
   msg($('#admMsg'),'Token apagado deste navegador.','');
 };
 
-$('#btnAccSet').onclick=async()=>{
-  const p1=$('#cAccPwd').value, p2=$('#cAccPwd2').value, M=$('#accMsg');
-  if(p1.length<10) return msg(M,'Use pelo menos 10 caracteres.','err');
+function loginUI(){
+  const on = VER===2 && !!DKEY;
+  $('#loginOff').style.display = (VER===0||!DKEY)?'':'none';
+  $('#loginOn').style.display = on?'':'none';
+  if(!on) return;
+  $('#listaUsers').innerHTML = USUARIOS.map(u=>`
+    <div class="card" style="cursor:default">
+      <div class="n">👤 ${esc(u.u)}${norm(u.u)===norm(USER||'')?' <span class="badge">você</span>':''}</div>
+      <div class="m">
+        <button class="pw" data-u="${esc(u.u)}" style="padding:2px 8px;font-size:11px">trocar senha</button>
+        <button class="danger del" data-u="${esc(u.u)}" style="padding:2px 8px;font-size:11px">remover</button>
+      </div>
+    </div>`).join('');
+  $('#listaUsers').querySelectorAll('.del').forEach(b=>b.onclick=()=>removeUser(b.dataset.u));
+  $('#listaUsers').querySelectorAll('.pw').forEach(b=>b.onclick=()=>trocaSenha(b.dataset.u));
+}
+
+function exigeAdmin(M){
+  if(!TOKEN){ msg(M,'Destrave o modo admin antes (bloco 2).','err'); return false; }
+  return true;
+}
+
+$('#btnLoginOn').onclick=async()=>{
+  const u=$('#cU1').value.trim(), p1=$('#cP1').value, p2=$('#cP2').value, M=$('#accMsg');
+  if(!u) return msg(M,'Informe o nome do primeiro usuário.','err');
+  if(p1.length<8) return msg(M,'A senha precisa de pelo menos 8 caracteres.','err');
   if(p1!==p2) return msg(M,'As senhas não conferem.','err');
-  if(!TOKEN) return msg(M,'Destrave o modo admin antes (bloco 2).','err');
+  if(!exigeAdmin(M)) return;
   msg(M,'Criptografando…','');
-  DKDF=novoKdf(); DKEY=await kdfKey(p1,DKDF);
-  const ok=await persiste(M,'seguranca: ativa criptografia da lista');
-  if(ok){ localStorage.removeItem(LS_CACHE);
-    $('#cAccPwd').value=''; $('#cAccPwd2').value='';
-    msg(M,'✓ Lista criptografada. Guarde a senha — sem ela os dados não voltam.','ok');
+  DKRAW=crypto.getRandomValues(new Uint8Array(32));
+  DKEY=await importDK(DKRAW); VER=2;
+  USUARIOS=[await embrulha(u,p1,DKRAW)]; USER=u;
+  const ok=await persiste(M,`seguranca: ativa login (usuario ${u})`);
+  if(ok){
+    localStorage.removeItem(LS_CACHE);
+    sessionStorage.setItem('mapaGuinchos.sess',b64(DKRAW));
+    ['cU1','cP1','cP2'].forEach(i=>$('#'+i).value='');
+    msg(M,'✓ Login ativado. Guarde a senha — sem ela os dados não voltam.','ok');
     finaliza();
-  }
+  }else{ DKEY=DKRAW=null; VER=0; USUARIOS=[]; USER=null; loginUI(); }
 };
-$('#btnAccOff').onclick=async()=>{
+
+$('#btnUserAdd').onclick=async()=>{
+  const u=$('#cUN').value.trim(), p=$('#cUP').value, M=$('#accMsg');
+  if(!u) return msg(M,'Informe o usuário.','err');
+  if(p.length<8) return msg(M,'A senha precisa de pelo menos 8 caracteres.','err');
+  if(USUARIOS.some(x=>norm(x.u)===norm(u))) return msg(M,'Já existe um usuário com esse nome.','err');
+  if(!exigeAdmin(M)) return;
+  if(!DKRAW) return msg(M,'Entre com um usuário e senha para poder gerenciar contas.','err');
+  msg(M,'Criando…','');
+  USUARIOS.push(await embrulha(u,p,DKRAW));
+  if(await persiste(M,`usuarios: adiciona ${u}`)){
+    $('#cUN').value=''; $('#cUP').value='';
+    msg(M,`✓ Usuário "${u}" criado.`,'ok'); loginUI();
+  }else{ USUARIOS.pop(); loginUI(); }
+};
+
+async function removeUser(u){
   const M=$('#accMsg');
-  if(!TOKEN) return msg(M,'Destrave o modo admin antes (bloco 2).','err');
-  if(!confirm('Remover a criptografia? A lista ficará legível para qualquer pessoa.'))return;
-  DKEY=null; DKDF=null;
-  if(await persiste(M,'seguranca: remove criptografia da lista')){ msg(M,'Criptografia removida.',''); finaliza(); }
+  if(!exigeAdmin(M)) return;
+  if(USUARIOS.length<=1) return msg(M,'Não dá para remover o último usuário. Use "Desativar login".','err');
+  if(!confirm(`Remover o usuário "${u}"? Ele perde o acesso imediatamente.`))return;
+  const bak=USUARIOS.slice();
+  USUARIOS=USUARIOS.filter(x=>norm(x.u)!==norm(u));
+  if(await persiste(M,`usuarios: remove ${u}`)){ msg(M,`✓ Usuário "${u}" removido.`,'ok'); loginUI(); }
+  else { USUARIOS=bak; loginUI(); }
+}
+
+async function trocaSenha(u){
+  const M=$('#accMsg');
+  if(!exigeAdmin(M)) return;
+  if(!DKRAW) return msg(M,'Entre com um usuário e senha para poder gerenciar contas.','err');
+  const p=prompt(`Nova senha para "${u}" (mínimo 8 caracteres):`);
+  if(p===null) return;
+  if(p.length<8) return msg(M,'A senha precisa de pelo menos 8 caracteres.','err');
+  const bak=USUARIOS.slice();
+  const i=USUARIOS.findIndex(x=>norm(x.u)===norm(u));
+  USUARIOS[i]=await embrulha(USUARIOS[i].u,p,DKRAW);
+  if(await persiste(M,`usuarios: troca senha de ${u}`)) msg(M,`✓ Senha de "${u}" alterada.`,'ok');
+  else USUARIOS=bak;
+}
+
+$('#btnLoginOff').onclick=async()=>{
+  const M=$('#accMsg');
+  if(!exigeAdmin(M)) return;
+  if(!confirm('Desativar o login? A lista fica visível para qualquer pessoa com o link.'))return;
+  const bak={k:DKEY,r:DKRAW,u:USUARIOS,v:VER};
+  DKEY=null; DKRAW=null; USUARIOS=[]; VER=0; USER=null;
+  if(await persiste(M,'seguranca: desativa login')){
+    sessionStorage.removeItem('mapaGuinchos.sess');
+    msg(M,'Login desativado.',''); finaliza();
+  }else{ DKEY=bak.k; DKRAW=bak.r; USUARIOS=bak.u; VER=bak.v; loginUI(); }
 };
 
 $('#btnExport').onclick=()=>{

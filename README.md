@@ -19,44 +19,60 @@ README.md
 2. Settings → Pages → Source: **Deploy from a branch** → `main` / `/ (root)` → Save.
 3. Acesse `https://SEU-USUARIO.github.io/mapa-guinchos/`.
 
-## Segurança
+## Segurança e login
 
-O site tem **duas senhas independentes**, ambas opcionais:
+Duas camadas independentes:
 
-| | Para quê | Onde fica |
+| | Quem tem | Permite |
 |---|---|---|
-| **Senha de acesso** | Descriptografa a lista de empresas. Sem ela o site mostra só a tela de bloqueio — e o `empresas.json` no GitHub é texto ilegível, mesmo baixando direto. | Em lugar nenhum: só na cabeça de quem tem |
-| **Senha de admin** | Destrava o token do GitHub para poder adicionar/remover. | Cifra o token no `localStorage` deste navegador |
+| **Login** (usuário + senha) | Cada pessoa da equipe, com senha própria | Ver o mapa e a lista |
+| **Senha de admin + token** | Só você | Cadastrar, remover e gerenciar usuários |
 
-Criptografia: PBKDF2-SHA256 (310.000 iterações) + AES-GCM 256, via Web Crypto nativa do navegador.
+Sem login, o site fica aberto para qualquer um com o link.
 
-O `empresas.json` protegido fica assim:
+### Como funciona por baixo
+
+Envelope encryption. A lista é cifrada com uma **chave aleatória de 256 bits**; essa chave é guardada cifrada **uma vez para cada usuário**, com a senha dele. Entrar = descobrir a chave a partir da sua senha e então abrir a lista.
+
+O ganho prático: remover uma pessoa é apagar o envelope dela — ninguém mais precisa trocar de senha.
 
 ```json
-{"cifrado":1,"kdf":{"salt":"…","iter":310000},"iv":"…","ct":"…"}
+{
+  "cifrado": 2,
+  "usuarios": [
+    {"u":"felipe","kdf":{"salt":"…","iter":310000},"iv":"…","ct":"…"},
+    {"u":"joao",  "kdf":{"salt":"…","iter":310000},"iv":"…","ct":"…"}
+  ],
+  "iv": "…", "ct": "…"
+}
 ```
 
-> ⚠️ **A segurança depende inteiramente da força da senha de acesso.** O arquivo cifrado é público — quem quiser pode baixar e tentar quebrar offline. Use uma senha longa (frase de 4+ palavras).
-> ⚠️ **Perdeu a senha de acesso, perdeu os dados.** Não existe recuperação. Use **Exportar JSON** de vez em quando.
+`ct` de cada usuário é a chave dos dados cifrada com a senha daquele usuário. O `ct` de fora é a lista de empresas.
+
+Cripto: PBKDF2-SHA256 (310.000 iterações) + AES-GCM 256, tudo com Web Crypto nativa. Sem biblioteca externa.
+
+> ⚠️ **A proteção vale o que valer a senha mais fraca.** O arquivo cifrado é público — dá para baixar e tentar quebrar offline. Exija senhas longas.
+> ⚠️ **Perdeu todas as senhas, perdeu os dados.** Não há recuperação. Exporte o JSON de vez em quando.
+> ℹ️ A sessão fica aberta enquanto a aba existir (`sessionStorage`). Fechou a aba, pede login de novo.
 
 ## Configurar (aba Config)
 
-**1 · Repositório** — usuário, repo, branch e nome do arquivo. Salvar recarrega a página.
+**1 · Repositório** — usuário, repo, branch e arquivo. Salvar recarrega a página.
 
 **2 · Admin (token)**
 
 1. GitHub → **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**
-2. Repository access: **Only select repositories** → escolha o repo do mapa
+2. Repository access: **Only select repositories** → o repo do mapa
 3. Permissions → Repository permissions → **Contents: Read and write**
-4. No site: defina uma **senha de admin** (8+ caracteres), cole o token e clique **Destravar admin**
+4. No site: crie uma **senha de admin** (8+), cole o token, **Destravar admin**
 
-Nas próximas vezes basta a senha — o token já fica cifrado no navegador. **Esquecer** apaga o token dali.
+Depois disso, só a senha destrava — o token fica cifrado no navegador. **Esquecer** o apaga dali.
 
-**3 · Senha de acesso** — com o admin destravado, defina a senha (10+ caracteres) e clique **Aplicar**. Isso criptografa a lista e faz o commit. **Remover** volta a lista para texto puro.
+**3 · Login e usuários** — com o admin destravado, crie o primeiro usuário e clique **Ativar login**. Depois o bloco vira a lista de contas, onde dá para **adicionar**, **trocar senha** e **remover**. Não é possível remover o último usuário (use **Desativar login**).
 
 **4 · Backup** — importar um `.json` exportado antes.
 
-Cada adição/remoção vira um commit no `empresas.json`. O GitHub Pages leva ~30–60s para republicar.
+Toda alteração vira um commit automático no `empresas.json`. O GitHub Pages republica em ~30–60s.
 
 ## Formato de `empresas.json`
 
@@ -82,7 +98,7 @@ Cada adição/remoção vira um commit no `empresas.json`. O GitHub Pages leva ~
 
 - Clique em um estado → filtra a lista; clique de novo → limpa
 - Zoom com scroll, arrastar para mover, botões `+ − ⟲`
-- Botão **🔒 Bloquear** volta para a tela de senha e limpa os dados da memória
+- Botão **🔒 Bloquear** encerra a sessão e volta para a tela de login
 - Busca por nome, cidade ou telefone; filtro por UF e por tipo
 - Pontos de empresas na mesma cidade se espalham em círculo (não sobrepõem)
 - Telefone vira link `tel:` no celular
