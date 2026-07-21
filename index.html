@@ -222,23 +222,48 @@ async function api(rota,opts={}){
 }
 
 /* ---------- mapa (MapLibre + CARTO dark) ---------- */
-let camadasFeitas=false;
+const BRASIL=[[-74.2,-34.0],[-34.6,5.5]];   // sudoeste, nordeste
+// Estilo reserva: tiles raster dark do CARTO num estilo inline (sem style.json
+// externo). Visual quase idêntico e carrega até quando o vetorial engasga.
+const ESTILO_RASTER={version:8,
+  glyphs:'https://tiles.basemaps.cartocdn.com/fonts/{fontstack}/{range}.pbf',
+  sources:{base:{type:'raster',tileSize:256,attribution:'© CARTO © OpenStreetMap contributors',
+    tiles:['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+           'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+           'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png']}},
+  layers:[{id:'base',type:'raster',source:'base'}]};
+
+let camadasFeitas=false, usouReserva=false;
 function iniciaMapa(){
+  const teste=document.createElement('canvas');
+  if(!(teste.getContext('webgl2')||teste.getContext('webgl'))){
+    $('#map').innerHTML='<div style="display:flex;height:100%;align-items:center;justify-content:center;color:#8d99a8;font-size:13px;padding:20px;text-align:center">Seu navegador está sem aceleração WebGL — o mapa com ruas não pode ser exibido.<br>A lista ao lado continua funcionando normalmente.</div>';
+    return;
+  }
   map=new maplibregl.Map({
     container:'map',
     style:'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-    center:[-52.5,-14.5], zoom:3.2, attributionControl:{compact:true},
+    bounds:BRASIL, fitBoundsOptions:{padding:30},
+    attributionControl:{compact:true},
     preserveDrawingBuffer:true
   });
   map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');
-  // Vários gatilhos + tentativas repetidas, porque em alguns navegadores o
-  // evento 'load'/'idle' e o isStyleLoaded() demoram ou não sinalizam direito.
+  // Vários gatilhos + tentativas contínuas: em alguns navegadores 'load'/'idle'
+  // e isStyleLoaded() não sinalizam direito com estilo vetorial externo.
   map.on('load', montaCamadas);
   map.on('idle', montaCamadas);
   map.on('styledata', montaCamadas);
-  let tentativas=0;
-  const timer=setInterval(()=>{ if(camadasFeitas || ++tentativas>40){ clearInterval(timer); return; } montaCamadas(); }, 300);
+  setInterval(()=>{ if(!camadasFeitas) montaCamadas(); }, 400);
+  // plano B: se em 7 s o estilo vetorial não montou, troca pro raster inline
+  setTimeout(()=>{
+    if(!camadasFeitas && !usouReserva){
+      usouReserva=true;
+      camadasFeitas=false;
+      map.setStyle(ESTILO_RASTER);       // os gatilhos acima remontam as camadas
+    }
+  }, 7000);
 }
+let handlersFeitos=false;
 function montaCamadas(){
   if(camadasFeitas) return;
   try{ map.addSource('empresas',{type:'geojson',data:geojson(ultimaLista),
@@ -246,15 +271,19 @@ function montaCamadas(){
   catch(e){ return; }   // estilo ainda não pronto; o próximo gatilho tenta de novo
   camadasFeitas=true;
 
+  // halo suave por baixo do cluster, estilo apps de rastreamento
+  map.addLayer({id:'clusters-halo',type:'circle',source:'empresas',filter:['has','point_count'],
+    paint:{'circle-color':'#ffb020','circle-opacity':0.22,
+      'circle-radius':['step',['get','point_count'],20,10,26,50,33]}});
   map.addLayer({id:'clusters',type:'circle',source:'empresas',filter:['has','point_count'],
     paint:{
-      'circle-color':'#ffb020','circle-opacity':0.92,
+      'circle-color':'#ffb020','circle-opacity':0.95,
       'circle-stroke-width':2,'circle-stroke-color':'#0d1014',
       'circle-radius':['step',['get','point_count'],13,10,17,50,22]
     }});
   map.addLayer({id:'clusters-num',type:'symbol',source:'empresas',filter:['has','point_count'],
     layout:{'text-field':['get','point_count_abbreviated'],'text-size':12,
-      'text-font':['Open Sans Bold']},
+      'text-font':['Open Sans Bold'],'text-allow-overlap':true},
     paint:{'text-color':'#1a1206'}});
   map.addLayer({id:'ponto',type:'circle',source:'empresas',filter:['!',['has','point_count']],
     paint:{
@@ -262,15 +291,18 @@ function montaCamadas(){
       'circle-radius':7,'circle-stroke-width':1.5,'circle-stroke-color':'#0d1014'
     }});
 
-  map.on('click','clusters',e=>{
-    const f=map.queryRenderedFeatures(e.point,{layers:['clusters']})[0];
-    map.getSource('empresas').getClusterExpansionZoom(f.properties.cluster_id).then(z=>
-      map.easeTo({center:f.geometry.coordinates,zoom:z}));
-  });
-  map.on('click','ponto',e=>abrePopup(e.features[0]));
-  for(const l of ['clusters','ponto']){
-    map.on('mouseenter',l,()=>map.getCanvas().style.cursor='pointer');
-    map.on('mouseleave',l,()=>map.getCanvas().style.cursor='');
+  if(!handlersFeitos){   // handlers sobrevivem ao setStyle; registra só uma vez
+    handlersFeitos=true;
+    map.on('click','clusters',e=>{
+      const f=map.queryRenderedFeatures(e.point,{layers:['clusters']})[0];
+      map.getSource('empresas').getClusterExpansionZoom(f.properties.cluster_id).then(z=>
+        map.easeTo({center:f.geometry.coordinates,zoom:z}));
+    });
+    map.on('click','ponto',e=>abrePopup(e.features[0]));
+    for(const l of ['clusters','ponto']){
+      map.on('mouseenter',l,()=>map.getCanvas().style.cursor='pointer');
+      map.on('mouseleave',l,()=>map.getCanvas().style.cursor='');
+    }
   }
   mapaPronto=true; atualizaMapa(ultimaLista);
 }
