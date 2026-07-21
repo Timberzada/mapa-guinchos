@@ -168,8 +168,11 @@ app.post('/api/usuarios/:id/senha', exigeLogin, exigeAdmin, async (req, res) => 
 const ESTATICOS = {
   '/':             ['index.html',  'text/html; charset=utf-8', 'no-cache'],
   '/index.html':   ['index.html',  'text/html; charset=utf-8', 'no-cache'],
-  '/mapa.json':    ['mapa.json',   'application/json',         'public, max-age=86400'],
-  '/cidades.json': ['cidades.json','application/json',         'public, max-age=86400']
+  // no-cache (revalida via ETag) para os dados sempre chegarem atualizados
+  // depois de um deploy; sendFile já manda ETag/Last-Modified, então o
+  // navegador recebe 304 quando nada mudou — atualiza sem custo de banda.
+  '/mapa.json':    ['mapa.json',   'application/json',         'no-cache'],
+  '/cidades.json': ['cidades.json','application/json',         'no-cache']
 };
 app.get(Object.keys(ESTATICOS), (req, res) => {
   const [arquivo, tipo, cache] = ESTATICOS[req.path];
