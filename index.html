@@ -329,64 +329,85 @@ function desenhaMapa(){
   });
   zoomPan(s);
 }
-// Um ponto por cidade. Cidade com mais de uma empresa vira um ponto um pouco
-// maior com a quantidade dentro — melhor que espalhar vários pontos em círculo,
-// que embolava tudo em estados com muitos cadastros.
-let ESCALA=1;
-function desenhaPontos(){
-  const g=$('#gPt'), grupos={};
-  DADOS.forEach(e=>{ const k=e.uf+'|'+e.cidade; (grupos[k]=grupos[k]||[]).push(e); });
-  let h='';
-  for(const k in grupos){
-    const arr=grupos[k], e=arr[0], n=arr.length;
+/* Pontos com agrupamento por proximidade.
+   Com o Brasil inteiro na tela um estado pequeno tem ~120px: não cabem 18 cidades
+   lado a lado sem virar mancha. Então empresas que cairiam a menos de ~15px umas
+   das outras viram um ponto só com a contagem, e vão se separando conforme o zoom.
+   Os raios também acompanham o zoom, para o ponto ter sempre o mesmo tamanho na tela. */
+let ESCALA=1, zoomPara=null;
+const R_SOLO=2.8, R_GRUPO=5.2, CELULA=19;
+
+function agrupa(){
+  const cel=CELULA*ESCALA, mapa=new Map();
+  DADOS.forEach(e=>{
     const [x,y]=proj(e.lat,e.lon);
-    const tipos=[...new Set(arr.map(a=>a.tipo))];
-    const cor = tipos.length===1 ? CORES[tipos[0]] : '#c9d4e0';   // cidade com tipos variados
-    const r = n>1 ? 5 : 3.4;
-    const forte = arr.some(a=>a.id===destaque);
-    h+=`<circle class="pt${forte?' hl':''}" data-k="${esc(k)}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}"
-         r="${r}" fill="${cor}" stroke-width="1.1"/>`;
-    if(n>1) h+=`<text class="ptn" x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="6">${n}</text>`;
-  }
-  g.innerHTML=h;
-  aplicaEscala();
-  g.querySelectorAll('.pt').forEach(c=>{
-    const arr=grupos[c.dataset.k]; if(!arr)return;
-    c.addEventListener('mouseenter',ev=>{
-      const w=$('#mapwrap').getBoundingClientRect(), t=$('#tip'), e=arr[0];
+    const k=Math.floor(x/cel)+':'+Math.floor(y/cel);
+    if(!mapa.has(k)) mapa.set(k,{itens:[],sx:0,sy:0});
+    const g=mapa.get(k); g.itens.push(e); g.sx+=x; g.sy+=y;
+  });
+  return [...mapa.values()].map(g=>({
+    itens:g.itens, n:g.itens.length,
+    x:g.sx/g.itens.length, y:g.sy/g.itens.length,
+    cidades:[...new Set(g.itens.map(i=>i.cidade))]
+  }));
+}
+
+function desenhaPontos(){
+  const g=$('#gPt'), grupos=agrupa();
+  g.innerHTML=grupos.map((c,i)=>{
+    const tipos=[...new Set(c.itens.map(a=>a.tipo))];
+    const cor = tipos.length===1 ? CORES[tipos[0]] : '#c9d4e0';   // grupo com tipos variados
+    const r=(c.n>1?R_GRUPO:R_SOLO)*ESCALA;
+    const forte=c.itens.some(a=>a.id===destaque);
+    return `<circle class="pt${forte?' hl':''}" data-i="${i}" cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}"
+             r="${r.toFixed(2)}" fill="${cor}" stroke-width="${(1.1*ESCALA).toFixed(2)}"/>`
+      + (c.n>1?`<text class="ptn" x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" font-size="${(6*ESCALA).toFixed(2)}">${c.n}</text>`:'');
+  }).join('');
+
+  g.querySelectorAll('.pt').forEach(el=>{
+    const c=grupos[+el.dataset.i];
+    el.addEventListener('mouseenter',ev=>{
+      const w=$('#mapwrap').getBoundingClientRect(), t=$('#tip'), e=c.itens[0];
       t.style.display='block';
-      t.innerHTML = arr.length===1
+      t.innerHTML = c.n===1
         ? `<b>${esc(e.nome)}</b><br>${esc(e.cidade)} – ${e.uf}<br>${esc(e.telefone)}<br><span style="color:${CORES[e.tipo]}">${ROTULO[e.tipo]}</span>`
-        : `<b>${esc(e.cidade)} – ${e.uf}</b><br>${arr.length} empresas<br>`
-          + arr.slice(0,4).map(a=>`<span style="color:${CORES[a.tipo]}">•</span> ${esc(a.nome)}`).join('<br>')
-          + (arr.length>4?`<br><span style="color:#8d99a8">e mais ${arr.length-4}…</span>`:'');
+        : `<b>${c.n} empresas</b><br><span style="color:#8d99a8">${esc(c.cidades.slice(0,3).join(', '))}${c.cidades.length>3?` +${c.cidades.length-3}`:''}</span><br>`
+          + c.itens.slice(0,4).map(a=>`<span style="color:${CORES[a.tipo]}">•</span> ${esc(a.nome)}`).join('<br>')
+          + (c.n>4?`<br><span style="color:#8d99a8">e mais ${c.n-4}…</span>`:'');
       t.style.left=Math.min(ev.clientX-w.left+12,w.width-270)+'px'; t.style.top=(ev.clientY-w.top+12)+'px';
     });
-    c.addEventListener('mouseleave',()=>$('#tip').style.display='none');
-    c.addEventListener('click',()=>{
-      if(arr.length>1){ $('#q').value=arr[0].cidade; destaque=null; }   // clicar no grupo filtra a cidade
-      else destaque=arr[0].id;
-      render();
-      const el=destaque && document.getElementById('card-'+destaque);
-      if(el) el.scrollIntoView({block:'center',behavior:'smooth'});
+    el.addEventListener('mouseleave',()=>$('#tip').style.display='none');
+    el.addEventListener('click',()=>{
+      if(c.n===1){
+        destaque=c.itens[0].id; render();
+        document.getElementById('card-'+destaque)?.scrollIntoView({block:'center',behavior:'smooth'});
+      } else if(c.cidades.length===1){
+        $('#q').value=c.cidades[0]; destaque=null; render();   // já é uma cidade só: filtra a lista
+      } else {
+        zoomPara && zoomPara(c.x,c.y);                          // várias cidades: aproxima e separa
+      }
     });
   });
 }
-// Mantém os pontos do mesmo tamanho na tela em qualquer nível de zoom.
-function aplicaEscala(){
-  document.querySelectorAll('#gPt .pt').forEach(c=>{
-    const base=c.nextElementSibling?.classList.contains('ptn')?5:3.4;
-    c.setAttribute('r',(base*ESCALA).toFixed(2));
-    c.setAttribute('stroke-width',(1.1*ESCALA).toFixed(2));
-  });
-  document.querySelectorAll('#gPt .ptn').forEach(t=>t.setAttribute('font-size',(6*ESCALA).toFixed(2)));
-}
 function zoomPan(svg){
-  let vb=[0,0,VBW,MAPA.height]; const base=vb.slice(); let drag=null;
-  const set=()=>{ svg.setAttribute('viewBox',vb.join(' ')); ESCALA=vb[2]/base[2]; aplicaEscala(); };
+  let vb=[0,0,VBW,MAPA.height]; const base=vb.slice(); let drag=null, pendente=null;
+  const set=()=>{
+    svg.setAttribute('viewBox',vb.join(' '));
+    const nova=vb[2]/base[2];
+    if(nova!==ESCALA){                       // só reagrupa quando o zoom muda, não ao arrastar
+      ESCALA=nova;
+      cancelAnimationFrame(pendente);
+      pendente=requestAnimationFrame(()=>{ if(pronto) desenhaPontos(); });
+    }
+  };
   const zoom=(f,cx,cy)=>{
     const nw=Math.min(base[2],Math.max(base[2]/14,vb[2]*f)), nh=nw*base[3]/base[2];
     vb[0]+=(cx-vb[0])*(1-nw/vb[2]); vb[1]+=(cy-vb[1])*(1-nh/vb[3]); vb[2]=nw; vb[3]=nh; set();
+  };
+  // clicar num grupo de várias cidades aproxima até separá-las
+  zoomPara=(x,y)=>{
+    const nw=Math.max(base[2]/14,vb[2]/2.6), nh=nw*base[3]/base[2];
+    vb=[x-nw/2, y-nh/2, nw, nh]; set();
   };
   const pt=e=>{const r=svg.getBoundingClientRect();return [vb[0]+(e.clientX-r.left)/r.width*vb[2], vb[1]+(e.clientY-r.top)/r.height*vb[3]];};
   svg.addEventListener('wheel',e=>{e.preventDefault();const[cx,cy]=pt(e);zoom(e.deltaY>0?1.15:0.87,cx,cy)},{passive:false});
