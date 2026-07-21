@@ -36,9 +36,10 @@ main{display:grid;grid-template-columns:1fr 380px;height:calc(100vh - 53px)}
 .uflbl.fora.on{fill:var(--verde)}
 .lead{stroke:#4a5866;stroke-width:1}
 .lead.on{stroke:var(--verde)}
-.pt{stroke:#0f1216;stroke-width:1.2;cursor:pointer}
-.pt:hover{stroke:#fff;stroke-width:2}
-.pt.hl{stroke:#fff;stroke-width:2.5}
+.pt{stroke:#0d1014;cursor:pointer}
+.pt:hover{stroke:#fff}
+.pt.hl{stroke:#fff}
+.ptn{fill:#10240f;font-weight:700;pointer-events:none;text-anchor:middle;dominant-baseline:central}
 #tip{position:absolute;pointer-events:none;background:#0b0e12ee;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;display:none;max-width:260px;z-index:5;box-shadow:0 6px 20px #0008}
 #tip b{color:var(--acc)}
 #zoomui{position:absolute;left:12px;bottom:12px;display:flex;flex-direction:column;gap:6px}
@@ -63,6 +64,9 @@ label{display:block;font-size:12px;color:var(--mut);margin:10px 0 4px}
 .card .n i{width:9px;height:9px;border-radius:99px;flex:0 0 auto}
 .card .m{color:var(--mut);font-size:12px;margin-top:3px;display:flex;justify-content:space-between;gap:8px;align-items:center}
 .card a{color:var(--acc2);text-decoration:none}
+.zap{display:inline-flex;align-items:center;gap:5px;background:#1e7d4f;color:#eafff4;padding:5px 10px;border-radius:99px;font-size:12px;font-weight:650;text-decoration:none;line-height:1;white-space:nowrap;transition:background .12s}
+.zap:hover{background:#26a464;color:#fff}
+.zap svg{width:13px;height:13px;fill:currentColor;flex:0 0 auto}
 .empty{color:var(--mut);text-align:center;padding:30px 10px;font-size:13px}
 .hint{color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.5}
 .ok{color:#31d07a}.err{color:#ff8080}
@@ -206,6 +210,25 @@ let ufSel='', destaque=null, pronto=false;
 const $=s=>document.querySelector(s);
 
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// Monta o número no formato que o WhatsApp espera: DDI + DDD + número, só dígitos.
+function zapNum(tel){
+  let d=String(tel||'').replace(/\D/g,'');
+  d=d.replace(/^0+/,'');                       // tira zero de operadora
+  if(d.length>=12 && d.startsWith('55')) return d;
+  if(d.length===10 || d.length===11) return '55'+d;   // com DDD
+  if(d.length===8 || d.length===9) return null;       // sem DDD, não dá pra chamar
+  return d.length>=12 ? d : null;
+}
+const ICONE_ZAP='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.2-1.8-.9-2-1-.3-.1-.5-.2-.7.1-.2.3-.7 1-.9 1.2-.2.2-.3.2-.6.1-.3-.2-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.6c.1-.2.2-.3.3-.5 0-.2 0-.4 0-.5 0-.2-.7-1.6-.9-2.2-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.5.3-.7.3-1.3.2-1.5 0-.1-.2-.2-.5-.3zM12 2C6.5 2 2 6.5 2 12c0 1.8.5 3.4 1.3 4.9L2 22l5.3-1.4c1.4.8 3 1.2 4.7 1.2 5.5 0 10-4.5 10-10S17.5 2 12 2z"/></svg>';
+
+function botaoZap(tel){
+  const n=zapNum(tel);
+  // Sem DDD não dá para abrir o WhatsApp; cai no discador do celular.
+  if(!n) return `<a class="zap" style="background:#2a323c" href="tel:${esc(String(tel).replace(/\D/g,''))}" title="Sem DDD — abre o discador">${esc(tel)}</a>`;
+  return `<a class="zap" href="https://wa.me/${n}" target="_blank" rel="noopener"
+            title="Abrir conversa no WhatsApp">${ICONE_ZAP}${esc(tel)}</a>`;
+}
 const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 const msg=(el,t,cls)=>{ el.className=cls||''; el.textContent=t; };
 
@@ -306,35 +329,61 @@ function desenhaMapa(){
   });
   zoomPan(s);
 }
+// Um ponto por cidade. Cidade com mais de uma empresa vira um ponto um pouco
+// maior com a quantidade dentro — melhor que espalhar vários pontos em círculo,
+// que embolava tudo em estados com muitos cadastros.
+let ESCALA=1;
 function desenhaPontos(){
   const g=$('#gPt'), grupos={};
   DADOS.forEach(e=>{ const k=e.uf+'|'+e.cidade; (grupos[k]=grupos[k]||[]).push(e); });
   let h='';
   for(const k in grupos){
-    const arr=grupos[k];
-    arr.forEach((e,i)=>{
-      let [x,y]=proj(e.lat,e.lon);
-      if(arr.length>1){ const a=i/arr.length*Math.PI*2, r=3+arr.length*0.5; x+=Math.cos(a)*r; y+=Math.sin(a)*r; }
-      h+=`<circle class="pt${destaque===e.id?' hl':''}" data-id="${e.id}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.2" fill="${CORES[e.tipo]||'#aaa'}"/>`;
-    });
+    const arr=grupos[k], e=arr[0], n=arr.length;
+    const [x,y]=proj(e.lat,e.lon);
+    const tipos=[...new Set(arr.map(a=>a.tipo))];
+    const cor = tipos.length===1 ? CORES[tipos[0]] : '#c9d4e0';   // cidade com tipos variados
+    const r = n>1 ? 5 : 3.4;
+    const forte = arr.some(a=>a.id===destaque);
+    h+=`<circle class="pt${forte?' hl':''}" data-k="${esc(k)}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}"
+         r="${r}" fill="${cor}" stroke-width="1.1"/>`;
+    if(n>1) h+=`<text class="ptn" x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="6">${n}</text>`;
   }
   g.innerHTML=h;
+  aplicaEscala();
   g.querySelectorAll('.pt').forEach(c=>{
+    const arr=grupos[c.dataset.k]; if(!arr)return;
     c.addEventListener('mouseenter',ev=>{
-      const e=DADOS.find(d=>d.id===c.dataset.id); if(!e)return;
-      const w=$('#mapwrap').getBoundingClientRect(), t=$('#tip');
+      const w=$('#mapwrap').getBoundingClientRect(), t=$('#tip'), e=arr[0];
       t.style.display='block';
-      t.innerHTML=`<b>${esc(e.nome)}</b><br>${esc(e.cidade)} – ${e.uf}<br>${esc(e.telefone)}<br><span style="color:${CORES[e.tipo]}">${ROTULO[e.tipo]}</span>`;
+      t.innerHTML = arr.length===1
+        ? `<b>${esc(e.nome)}</b><br>${esc(e.cidade)} – ${e.uf}<br>${esc(e.telefone)}<br><span style="color:${CORES[e.tipo]}">${ROTULO[e.tipo]}</span>`
+        : `<b>${esc(e.cidade)} – ${e.uf}</b><br>${arr.length} empresas<br>`
+          + arr.slice(0,4).map(a=>`<span style="color:${CORES[a.tipo]}">•</span> ${esc(a.nome)}`).join('<br>')
+          + (arr.length>4?`<br><span style="color:#8d99a8">e mais ${arr.length-4}…</span>`:'');
       t.style.left=Math.min(ev.clientX-w.left+12,w.width-270)+'px'; t.style.top=(ev.clientY-w.top+12)+'px';
     });
     c.addEventListener('mouseleave',()=>$('#tip').style.display='none');
-    c.addEventListener('click',()=>{ destaque=c.dataset.id; render();
-      const el=document.getElementById('card-'+destaque); if(el) el.scrollIntoView({block:'center',behavior:'smooth'}); });
+    c.addEventListener('click',()=>{
+      if(arr.length>1){ $('#q').value=arr[0].cidade; destaque=null; }   // clicar no grupo filtra a cidade
+      else destaque=arr[0].id;
+      render();
+      const el=destaque && document.getElementById('card-'+destaque);
+      if(el) el.scrollIntoView({block:'center',behavior:'smooth'});
+    });
   });
+}
+// Mantém os pontos do mesmo tamanho na tela em qualquer nível de zoom.
+function aplicaEscala(){
+  document.querySelectorAll('#gPt .pt').forEach(c=>{
+    const base=c.nextElementSibling?.classList.contains('ptn')?5:3.4;
+    c.setAttribute('r',(base*ESCALA).toFixed(2));
+    c.setAttribute('stroke-width',(1.1*ESCALA).toFixed(2));
+  });
+  document.querySelectorAll('#gPt .ptn').forEach(t=>t.setAttribute('font-size',(6*ESCALA).toFixed(2)));
 }
 function zoomPan(svg){
   let vb=[0,0,VBW,MAPA.height]; const base=vb.slice(); let drag=null;
-  const set=()=>svg.setAttribute('viewBox',vb.join(' '));
+  const set=()=>{ svg.setAttribute('viewBox',vb.join(' ')); ESCALA=vb[2]/base[2]; aplicaEscala(); };
   const zoom=(f,cx,cy)=>{
     const nw=Math.min(base[2],Math.max(base[2]/14,vb[2]*f)), nh=nw*base[3]/base[2];
     vb[0]+=(cx-vb[0])*(1-nw/vb[2]); vb[1]+=(cy-vb[1])*(1-nh/vb[3]); vb[2]=nw; vb[3]=nh; set();
@@ -382,12 +431,13 @@ function render(){
   $('#lista').innerHTML = lst.length ? lst.map(e=>`
     <div class="card" id="card-${e.id}" data-id="${e.id}" style="${destaque===e.id?'border-color:var(--acc)':''}">
       <div class="n"><i style="background:${CORES[e.tipo]}"></i>${esc(e.nome)}</div>
-      <div class="m"><span>${esc(e.cidade)} – ${e.uf}</span><a href="tel:${esc(String(e.telefone).replace(/\D/g,''))}">${esc(e.telefone)}</a></div>
+      <div class="m"><span>${esc(e.cidade)} – ${e.uf}</span>${botaoZap(e.telefone)}</div>
       <div class="m"><span style="color:${CORES[e.tipo]}">${ROTULO[e.tipo]}</span>
         ${EU.admin?`<button class="danger rm" data-id="${e.id}" style="padding:2px 8px;font-size:11px">remover</button>`:''}</div>
     </div>`).join('') : `<div class="empty">Nenhuma empresa encontrada.${EU.admin?'<br>Use a aba <b>Adicionar</b>.':''}</div>`;
   $('#lista').querySelectorAll('.card').forEach(c=>c.onclick=ev=>{
-    if(ev.target.classList.contains('rm'))return; destaque=c.dataset.id; render();
+    if(ev.target.closest('.rm,.zap'))return;   // não sequestra o clique do botão de WhatsApp
+    destaque=c.dataset.id; render();
   });
   $('#lista').querySelectorAll('.rm').forEach(b=>b.onclick=async ev=>{
     ev.stopPropagation();
