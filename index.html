@@ -8,7 +8,7 @@
 :root{
   --bg:#0f1216; --panel:#171b21; --panel2:#1e242c; --line:#2a323c;
   --txt:#e6eaf0; --mut:#8d99a8; --acc:#ffb020; --acc2:#3b9dff;
-  --guincho:#ffb020; --parabrisa:#3b9dff; --ambos:#31d07a; --map:#232b34; --mapH:#33404d;
+  --guincho:#ffb020; --parabrisa:#3b9dff; --ambos:#31d07a; --map:#232b34; --verde:#31d07a;
 }
 *{box-sizing:border-box}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt)}
@@ -28,11 +28,14 @@ main{display:grid;grid-template-columns:1fr 380px;height:calc(100vh - 53px)}
 #svgmap{width:100%;height:100%;display:block;cursor:grab}
 #svgmap.drag{cursor:grabbing}
 .uf{fill:var(--map);stroke:#0f1216;stroke-width:1.1;transition:fill .12s}
-.uf:hover{fill:var(--mapH)}
-.uf.sel{fill:#3a4a5c}
 .uf.has{fill:#2c3742}
-.uflbl{fill:#93a2b2;font-size:13px;font-weight:700;pointer-events:none;text-anchor:middle;dominant-baseline:middle}
+.uf:hover{fill:var(--verde)}
+.uf.sel{fill:var(--verde);stroke:#d8fbe9;stroke-width:2}
+.uflbl{fill:#93a2b2;font-size:13px;font-weight:700;pointer-events:none;text-anchor:middle;dominant-baseline:middle;transition:fill .12s}
+.uflbl.on{fill:#08351f}
+.uflbl.fora.on{fill:var(--verde)}
 .lead{stroke:#4a5866;stroke-width:1}
+.lead.on{stroke:var(--verde)}
 .pt{stroke:#0f1216;stroke-width:1.2;cursor:pointer}
 .pt:hover{stroke:#fff;stroke-width:2}
 .pt.hl{stroke:#fff;stroke-width:2.5}
@@ -283,15 +286,24 @@ function desenhaMapa(){
   h+='</g><g id="gLbl">';
   for(const uf in MAPA.labels){
     const c=MAPA.labels[uf], f=FORA[uf];
-    if(f) h+=`<line class="lead" x1="${c[0]}" y1="${c[1]}" x2="${f[0]-11}" y2="${f[1]}"/><text class="uflbl" x="${f[0]}" y="${f[1]}">${uf}</text>`;
-    else  h+=`<text class="uflbl" x="${c[0]}" y="${c[1]}">${uf}</text>`;
+    if(f) h+=`<line class="lead" id="ld-${uf}" x1="${c[0]}" y1="${c[1]}" x2="${f[0]-11}" y2="${f[1]}"/><text class="uflbl fora" id="lb-${uf}" x="${f[0]}" y="${f[1]}">${uf}</text>`;
+    else  h+=`<text class="uflbl" id="lb-${uf}" x="${c[0]}" y="${c[1]}">${uf}</text>`;
   }
   h+='</g><g id="gPt"></g>';
   s.innerHTML=h;
-  s.querySelectorAll('.uf').forEach(p=>p.addEventListener('click',e=>{
-    const uf=(e.target.dataset&&e.target.dataset.uf)||(e.target.parentNode&&e.target.parentNode.dataset.uf);
-    if(!uf)return; ufSel = ufSel===uf ? '' : uf; $('#fUf').value=ufSel; render();
-  }));
+  // a sigla acompanha o realce: escura sobre o verde, verde quando fica fora do estado
+  const acende=(uf,on)=>{
+    document.getElementById('lb-'+uf)?.classList.toggle('on', on || ufSel===uf);
+    document.getElementById('ld-'+uf)?.classList.toggle('on', on || ufSel===uf);
+  };
+  s.querySelectorAll('.uf').forEach(p=>{
+    const uf=p.dataset.uf;
+    p.addEventListener('mouseenter',()=>acende(uf,true));
+    p.addEventListener('mouseleave',()=>acende(uf,false));
+    p.addEventListener('click',()=>{
+      ufSel = ufSel===uf ? '' : uf; $('#fUf').value=ufSel; render();
+    });
+  });
   zoomPan(s);
 }
 function desenhaPontos(){
@@ -356,8 +368,11 @@ function render(){
   if(!pronto) return;
   $('#cnt').textContent=DADOS.length+(DADOS.length===1?' empresa':' empresas');
   document.querySelectorAll('.uf').forEach(p=>{
-    p.classList.toggle('sel',p.dataset.uf===ufSel);
-    p.classList.toggle('has',DADOS.some(d=>d.uf===p.dataset.uf));
+    const uf=p.dataset.uf, sel=uf===ufSel;
+    p.classList.toggle('sel',sel);
+    p.classList.toggle('has',DADOS.some(d=>d.uf===uf));
+    document.getElementById('lb-'+uf)?.classList.toggle('on',sel);
+    document.getElementById('ld-'+uf)?.classList.toggle('on',sel);
   });
   desenhaPontos();
   const qs=norm($('#q').value), t=$('#fTipo').value;
