@@ -337,6 +337,13 @@ function desenhaMapa(){
 let ESCALA=1, zoomPara=null;
 const R_SOLO=3.6, R_GRUPO=5.6, CELULA=19;
 
+/* Crescimento amortecido dos pontos com o zoom.
+   ESCALA = viewBox atual / viewBox original (1 sem zoom, 1/14 no zoom máximo).
+   Se o raio fosse fixo em unidades do mapa, o ponto cresceria junto com o mapa
+   e viraria uma bola gigante; se fosse ESCALA puro, ficaria sempre do mesmo
+   tamanho na tela. Com ESCALA^0.7 ele cresce, mas devagar: ~2,2x no zoom máximo. */
+const fator = () => Math.pow(ESCALA, 0.7);
+
 function agrupa(){
   const cel=CELULA*ESCALA, mapa=new Map();
   DADOS.forEach(e=>{
@@ -353,15 +360,15 @@ function agrupa(){
 }
 
 function desenhaPontos(){
-  const g=$('#gPt'), grupos=agrupa();
+  const g=$('#gPt'), grupos=agrupa(), f=fator();
   g.innerHTML=grupos.map((c,i)=>{
     const tipos=[...new Set(c.itens.map(a=>a.tipo))];
     const cor = tipos.length===1 ? CORES[tipos[0]] : '#c9d4e0';   // grupo com tipos variados
-    const r=(c.n>1?R_GRUPO:R_SOLO)*ESCALA;
+    const r=(c.n>1?R_GRUPO:R_SOLO)*f;
     const forte=c.itens.some(a=>a.id===destaque);
     return `<circle class="pt${forte?' hl':''}" data-i="${i}" cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}"
-             r="${r.toFixed(2)}" fill="${cor}" stroke-width="${(1.1*ESCALA).toFixed(2)}"/>`
-      + (c.n>1?`<text class="ptn" x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" font-size="${(6*ESCALA).toFixed(2)}">${c.n}</text>`:'');
+             r="${r.toFixed(2)}" fill="${cor}" stroke-width="${(1.1*f).toFixed(2)}"/>`
+      + (c.n>1?`<text class="ptn" x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" font-size="${(6*f).toFixed(2)}">${c.n}</text>`:'');
   }).join('');
 
   g.querySelectorAll('.pt').forEach(el=>{
