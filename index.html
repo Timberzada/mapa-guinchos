@@ -22,7 +22,7 @@ button.primary{background:var(--acc);color:#1a1206;border-color:var(--acc);font-
 button.danger{background:#3a1e1e;border-color:#5b2a2a;color:#ff9a9a}
 button:disabled{opacity:.5;cursor:default}
 .badge{font-size:11px;padding:2px 7px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);color:var(--mut)}
-main{display:grid;grid-template-columns:1fr 380px;height:calc(100vh - 53px)}
+main{display:grid;grid-template-columns:1fr 340px;height:calc(100vh - 53px)}
 @media(max-width:900px){main{grid-template-columns:1fr;height:auto}}
 #mapwrap{position:relative;overflow:hidden;background:radial-gradient(circle at 50% 40%,#141920,#0d1014)}
 #svgmap{width:100%;height:100%;display:block;cursor:grab}
@@ -399,31 +399,47 @@ function desenhaPontos(){
   });
 }
 
-/* Nomes das cidades — aparecem só quando você entra num estado.
-   Três cuidados para não travar nem poluir com 5.571 nomes:
-   1) só desenha se o zoom passou do limiar (viewBox menor que ~1-2 estados);
-   2) corte por área visível: ignora quem está fora da tela;
-   3) afinamento por densidade: no máximo um nome por célula da tela, então
-      onde as cidades são coladas mostra parte; quanto mais perto, mais nomes. */
-const LIMIAR_CID = 0.42;
+/* Nomes das cidades — no estilo do Google Maps: poucos, bem espaçados,
+   priorizando as cidades maiores. Só aparecem quando você entra num estado.
+   Como:
+   1) só desenha se o zoom passou do limiar (viewBox < ~1,5 estado);
+   2) corte por área visível — ignora quem está fora da tela;
+   3) ordena por população (maior primeiro) e vai colocando os nomes;
+   4) colisão retangular: um nome só entra se a caixa dele não toca nenhuma
+      já colocada. Assim capital e cidades grandes ganham o rótulo, e o resto
+      só aparece quando há espaço — nunca dois nomes sobrepostos. */
+const LIMIAR_CID = 0.40, MAX_CID = 50;
 function desenhaCidades(){
   const g=$('#gCid'); if(!g) return;
   if(!pronto || ESCALA > LIMIAR_CID){ if(g.firstChild) g.textContent=''; return; }
   const vb=$('#svgmap').getAttribute('viewBox').split(' ').map(Number);
-  const [x0,y0,w,hh]=vb, x1=x0+w, y1=y0+hh, mg=w*0.03;
-  const fs=9*ESCALA;                                   // ~constante na tela
-  const celX=w*0.060, celY=w*0.017;                    // ~1 nome a cada 65x18 px
-  const usadas=new Set();
-  let out='';
+  const [x0,y0,w,hh]=vb, x1=x0+w, y1=y0+hh, mg=w*0.05;
+  const fs=8.5*ESCALA;                                 // ~constante na tela
+
+  const vis=[];
   for(const uf in CIDADES.cidades){
     for(const c of CIDADES.cidades[uf]){
       const p=proj(c[1],c[2]);
       if(p[0]<x0-mg||p[0]>x1+mg||p[1]<y0-mg||p[1]>y1+mg) continue;
-      const k=((p[0]-x0)/celX|0)+':'+((p[1]-y0)/celY|0);
-      if(usadas.has(k)) continue; usadas.add(k);
-      out+=`<circle class="cidpt" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${(0.7*ESCALA).toFixed(2)}"/>`
-         + `<text class="cid" x="${p[0].toFixed(1)}" y="${(p[1]+fs*0.9).toFixed(1)}" font-size="${fs.toFixed(2)}" stroke-width="${(0.5*ESCALA).toFixed(2)}">${esc(c[0])}</text>`;
+      vis.push([c[3]||0, p[0], p[1], c[0]]);           // [pop, x, y, nome]
     }
+  }
+  vis.sort((a,b)=>b[0]-a[0]);                           // maior população primeiro
+
+  // grade de ocupação para a colisão; célula com folga para os nomes respirarem
+  const cel=fs*2.6, ocup=new Set(), gc=v=>Math.floor(v/cel);
+  let out='', n=0;
+  for(const [,px,py,nome] of vis){
+    if(n>=MAX_CID) break;
+    const halfW=nome.length*fs*0.34 + fs*1.8;          // meia-largura do rótulo, com espaço extra
+    const bx0=gc(px-halfW), bx1=gc(px+halfW), by0=gc(py-fs*0.3), by1=gc(py+fs*1.6);
+    let toca=false;
+    for(let gx=bx0; gx<=bx1 && !toca; gx++) for(let gy=by0; gy<=by1; gy++){ if(ocup.has(gx+':'+gy)){ toca=true; break; } }
+    if(toca) continue;
+    for(let gx=bx0; gx<=bx1; gx++) for(let gy=by0; gy<=by1; gy++) ocup.add(gx+':'+gy);
+    out+=`<circle class="cidpt" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(0.7*ESCALA).toFixed(2)}"/>`
+       + `<text class="cid" x="${px.toFixed(1)}" y="${(py+fs*0.85).toFixed(1)}" font-size="${fs.toFixed(2)}" stroke-width="${(0.5*ESCALA).toFixed(2)}">${esc(nome)}</text>`;
+    n++;
   }
   g.innerHTML=out;
 }
