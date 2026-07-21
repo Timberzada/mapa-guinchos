@@ -264,12 +264,38 @@ function iniciaMapa(){
   }, 7000);
 }
 let handlersFeitos=false;
+
+/* Ajustes no estilo base do CARTO:
+   - nomes de estado e de cidade aparecem com menos zoom (antes só bem perto);
+   - some com linhas que não são estrada: ferrovias, aéreos, balsas e rios finos.
+     São essas as "linhas estranhas" tracejadas que aparecem no meio do mapa. */
+function ajustaEstiloBase(){
+  let camadas;
+  try{ camadas=map.getStyle().layers; }catch(e){ return; }
+  for(const l of camadas){
+    const id=l.id;
+    try{
+      if(/rail|transit|aeroway|ferry|cable|^waterway/i.test(id)){
+        map.setLayoutProperty(id,'visibility','none');            // fora tudo que não é rua
+      } else if(/place[_-]?state|state[_-]?label/i.test(id)){
+        map.setLayerZoomRange(id, 3, l.maxzoom||24);              // estados desde bem longe
+        if(l.type==='symbol') map.setPaintProperty(id,'text-color','#9aa7b4');
+      } else if(/place[_-]?(city|capital)/i.test(id)){
+        map.setLayerZoomRange(id, Math.max(3,(l.minzoom??6)-2), l.maxzoom||24);   // cidades 2 níveis antes
+      } else if(/place[_-]?(town|village|suburb|hamlet)/i.test(id)){
+        map.setLayerZoomRange(id, Math.max(5,(l.minzoom??10)-2), l.maxzoom||24);  // cidades menores também
+      }
+    }catch(e){}
+  }
+}
 function montaCamadas(){
   if(camadasFeitas) return;
   try{ map.addSource('empresas',{type:'geojson',data:geojson(ultimaLista),
     cluster:true, clusterRadius:44, clusterMaxZoom:12}); }
   catch(e){ return; }   // estilo ainda não pronto; o próximo gatilho tenta de novo
   camadasFeitas=true;
+
+  ajustaEstiloBase();
 
   // halo suave por baixo do cluster, estilo apps de rastreamento
   map.addLayer({id:'clusters-halo',type:'circle',source:'empresas',filter:['has','point_count'],
