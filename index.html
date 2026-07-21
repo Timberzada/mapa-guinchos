@@ -4,11 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mapa de Guinchos & Para-brisas</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.css">
 <style>
 :root{
   --bg:#0f1216; --panel:#171b21; --panel2:#1e242c; --line:#2a323c;
   --txt:#e6eaf0; --mut:#8d99a8; --acc:#ffb020; --acc2:#3b9dff;
-  --guincho:#ffb020; --parabrisa:#3b9dff; --ambos:#31d07a; --map:#232b34; --verde:#31d07a;
+  --guincho:#ffb020; --parabrisa:#3b9dff; --ambos:#31d07a;
 }
 *{box-sizing:border-box}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt)}
@@ -24,29 +25,9 @@ button:disabled{opacity:.5;cursor:default}
 .badge{font-size:11px;padding:2px 7px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);color:var(--mut)}
 main{display:grid;grid-template-columns:1fr 340px;height:calc(100vh - 53px)}
 @media(max-width:900px){main{grid-template-columns:1fr;height:auto}}
-#mapwrap{position:relative;overflow:hidden;background:radial-gradient(circle at 50% 40%,#141920,#0d1014)}
-#svgmap{width:100%;height:100%;display:block;cursor:grab}
-#svgmap.drag{cursor:grabbing}
-.uf{fill:var(--map);stroke:#0f1216;stroke-width:1.1;transition:fill .12s}
-.uf.has{fill:#2c3742}
-.uf:hover{fill:var(--verde)}
-.uf.sel{fill:var(--verde);stroke:#d8fbe9;stroke-width:2}
-.uflbl{fill:#93a2b2;font-size:13px;font-weight:700;pointer-events:none;text-anchor:middle;dominant-baseline:middle;transition:fill .12s}
-.uflbl.on{fill:#08351f}
-.uflbl.fora.on{fill:var(--verde)}
-.lead{stroke:#4a5866;stroke-width:1}
-.lead.on{stroke:var(--verde)}
-.pt{stroke:#0d1014;cursor:pointer}
-.pt:hover{stroke:#fff}
-.pt.hl{stroke:#fff}
-.ptn{fill:#10240f;font-weight:700;pointer-events:none;text-anchor:middle;dominant-baseline:central}
-.cid{fill:#7b8794;font-weight:400;pointer-events:none;text-anchor:middle;dominant-baseline:hanging;paint-order:stroke;stroke:#0f1216;stroke-width:.5}
-.cidpt{fill:#586472;pointer-events:none}
-#tip{position:absolute;pointer-events:none;background:#0b0e12ee;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;display:none;max-width:260px;z-index:5;box-shadow:0 6px 20px #0008}
-#tip b{color:var(--acc)}
-#zoomui{position:absolute;left:12px;bottom:12px;display:flex;flex-direction:column;gap:6px}
-#zoomui button{width:34px;height:34px;padding:0;font-size:16px}
-#legend{position:absolute;right:12px;bottom:12px;background:#0b0e12cc;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px}
+#mapwrap{position:relative;overflow:hidden;background:#0d1014}
+#map{position:absolute;inset:0}
+#legend{position:absolute;right:12px;bottom:24px;background:#0b0e12cc;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;z-index:2;backdrop-filter:blur(2px)}
 #legend div{display:flex;align-items:center;gap:7px;margin:3px 0;color:var(--mut)}
 #legend i{width:10px;height:10px;border-radius:99px;display:inline-block}
 aside{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
@@ -65,7 +46,6 @@ label{display:block;font-size:12px;color:var(--mut);margin:10px 0 4px}
 .card .n{font-weight:650;display:flex;align-items:center;gap:6px}
 .card .n i{width:9px;height:9px;border-radius:99px;flex:0 0 auto}
 .card .m{color:var(--mut);font-size:12px;margin-top:3px;display:flex;justify-content:space-between;gap:8px;align-items:center}
-.card a{color:var(--acc2);text-decoration:none}
 .zap{display:inline-flex;align-items:center;gap:5px;background:#1e7d4f;color:#eafff4;padding:5px 10px;border-radius:99px;font-size:12px;font-weight:650;text-decoration:none;line-height:1;white-space:nowrap;transition:background .12s}
 .zap:hover{background:#26a464;color:#fff}
 .zap svg{width:13px;height:13px;fill:currentColor;flex:0 0 auto}
@@ -88,6 +68,15 @@ label.ck input{width:auto}
 #gate input+input{margin-top:8px}
 #gate button{width:100%;margin-top:10px;padding:11px}
 #gateMsg{font-size:12.5px;min-height:18px;margin-top:10px}
+/* popup do MapLibre no tema escuro */
+.maplibregl-popup-content{background:#0b0e12;border:1px solid var(--line);border-radius:10px;padding:10px 12px;box-shadow:0 6px 20px #0008;color:var(--txt)}
+.maplibregl-popup-tip{border-top-color:#0b0e12!important;border-bottom-color:#0b0e12!important}
+.maplibregl-popup-close-button{color:var(--mut);font-size:16px;padding:0 5px}
+.pop b{color:var(--acc)}
+.pop .lin{font-size:12px;color:var(--mut);margin:2px 0}
+.maplibregl-ctrl-group{background:var(--panel2);border:1px solid var(--line)}
+.maplibregl-ctrl-group button+button{border-top:1px solid var(--line)}
+.maplibregl-ctrl button .maplibregl-ctrl-icon{filter:invert(1) hue-rotate(180deg) brightness(1.1)}
 </style>
 </head>
 <body>
@@ -116,13 +105,7 @@ label.ck input{width:auto}
 
 <main>
   <div id="mapwrap">
-    <svg id="svgmap"></svg>
-    <div id="tip"></div>
-    <div id="zoomui">
-      <button id="zin" title="Aproximar">+</button>
-      <button id="zout" title="Afastar">−</button>
-      <button id="zreset" title="Resetar" style="font-size:13px">⟲</button>
-    </div>
+    <div id="map"></div>
     <div id="legend">
       <div><i style="background:var(--guincho)"></i>Guincho</div>
       <div><i style="background:var(--parabrisa)"></i>Para-brisa</div>
@@ -172,7 +155,7 @@ label.ck input{width:auto}
         <button id="btnLimpar" style="flex:0 0 auto">Limpar</button>
       </div>
       <div id="msg"></div>
-      <div class="hint">A cidade define a posição do ponto no mapa e é validada no servidor (base IBGE + GeoNames).</div>
+      <div class="hint">A cidade define a posição do ponto no mapa e é validada no servidor (base IBGE).</div>
     </div>
 
     <div class="pane" id="p-cfg">
@@ -189,7 +172,6 @@ label.ck input{width:auto}
         <div style="margin-top:12px"><button class="primary" id="btnUserAdd">Adicionar usuário</button></div>
         <div id="accMsg" style="font-size:12px;margin-top:10px"></div>
       </div>
-
       <div class="box">
         <h3>Backup</h3>
         <div class="hint" style="margin-top:0">Importar substitui toda a lista atual.</div>
@@ -201,74 +183,122 @@ label.ck input{width:auto}
   </aside>
 </main>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.js"></script>
 <script>
 const CORES={guincho:'#ffb020',parabrisa:'#3b9dff',ambos:'#31d07a'};
 const ROTULO={guincho:'Guincho',parabrisa:'Para-brisa',ambos:'Guincho + Para-brisa'};
-const FORA={RN:[965,262],PB:[965,296],PE:[965,330],AL:[965,364],SE:[965,398],ES:[930,576],RJ:[930,668],DF:[648,462]};
-const VBW=1010;
+const UFNOMES={AC:'Acre',AL:'Alagoas',AP:'Amapá',AM:'Amazonas',BA:'Bahia',CE:'Ceará',DF:'Distrito Federal',ES:'Espírito Santo',GO:'Goiás',MA:'Maranhão',MT:'Mato Grosso',MS:'Mato Grosso do Sul',MG:'Minas Gerais',PA:'Pará',PB:'Paraíba',PR:'Paraná',PE:'Pernambuco',PI:'Piauí',RJ:'Rio de Janeiro',RN:'Rio Grande do Norte',RS:'Rio Grande do Sul',RO:'Rondônia',RR:'Roraima',SC:'Santa Catarina',SP:'São Paulo',SE:'Sergipe',TO:'Tocantins'};
 
-let MAPA=null, CIDADES=null, DADOS=[], EU=null, MODO='login';
+let CIDADES=null, DADOS=[], EU=null, MODO='login';
 let ufSel='', destaque=null, pronto=false;
+let map=null, mapaPronto=false, ultimaLista=[], popup=null;
 const $=s=>document.querySelector(s);
 
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-
-// Monta o número no formato que o WhatsApp espera: DDI + DDD + número, só dígitos.
-function zapNum(tel){
-  let d=String(tel||'').replace(/\D/g,'');
-  d=d.replace(/^0+/,'');                       // tira zero de operadora
-  if(d.length>=12 && d.startsWith('55')) return d;
-  if(d.length===10 || d.length===11) return '55'+d;   // com DDD
-  if(d.length===8 || d.length===9) return null;       // sem DDD, não dá pra chamar
-  return d.length>=12 ? d : null;
-}
-const ICONE_ZAP='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.2-1.8-.9-2-1-.3-.1-.5-.2-.7.1-.2.3-.7 1-.9 1.2-.2.2-.3.2-.6.1-.3-.2-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.6c.1-.2.2-.3.3-.5 0-.2 0-.4 0-.5 0-.2-.7-1.6-.9-2.2-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.5.3-.7.3-1.3.2-1.5 0-.1-.2-.2-.5-.3zM12 2C6.5 2 2 6.5 2 12c0 1.8.5 3.4 1.3 4.9L2 22l5.3-1.4c1.4.8 3 1.2 4.7 1.2 5.5 0 10-4.5 10-10S17.5 2 12 2z"/></svg>';
-
-function botaoZap(tel){
-  const n=zapNum(tel);
-  // Sem DDD não dá para abrir o WhatsApp; cai no discador do celular.
-  if(!n) return `<a class="zap" style="background:#2a323c" href="tel:${esc(String(tel).replace(/\D/g,''))}" title="Sem DDD — abre o discador">${esc(tel)}</a>`;
-  return `<a class="zap" href="https://wa.me/${n}" target="_blank" rel="noopener"
-            title="Abrir conversa no WhatsApp">${ICONE_ZAP}${esc(tel)}</a>`;
-}
 const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 const msg=(el,t,cls)=>{ el.className=cls||''; el.textContent=t; };
 
+function zapNum(tel){
+  let d=String(tel||'').replace(/\D/g,'').replace(/^0+/,'');
+  if(d.length>=12 && d.startsWith('55')) return d;
+  if(d.length===10||d.length===11) return '55'+d;
+  if(d.length===8||d.length===9) return null;
+  return d.length>=12 ? d : null;
+}
+const ICONE_ZAP='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.2-1.8-.9-2-1-.3-.1-.5-.2-.7.1-.2.3-.7 1-.9 1.2-.2.2-.3.2-.6.1-.3-.2-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.6c.1-.2.2-.3.3-.5 0-.2 0-.4 0-.5 0-.2-.7-1.6-.9-2.2-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.5.3-.7.3-1.3.2-1.5 0-.1-.2-.2-.5-.3zM12 2C6.5 2 2 6.5 2 12c0 1.8.5 3.4 1.3 4.9L2 22l5.3-1.4c1.4.8 3 1.2 4.7 1.2 5.5 0 10-4.5 10-10S17.5 2 12 2z"/></svg>';
+function botaoZap(tel){
+  const n=zapNum(tel);
+  if(!n) return `<a class="zap" style="background:#2a323c" href="tel:${esc(String(tel).replace(/\D/g,''))}" title="Sem DDD — abre o discador">${esc(tel)}</a>`;
+  return `<a class="zap" href="https://wa.me/${n}" target="_blank" rel="noopener" title="Abrir conversa no WhatsApp">${ICONE_ZAP}${esc(tel)}</a>`;
+}
+
 async function api(rota,opts={}){
-  const r=await fetch('/api/'+rota,{
-    credentials:'same-origin',
-    headers:opts.body?{'Content-Type':'application/json'}:undefined,
-    ...opts,
-    body:opts.body?JSON.stringify(opts.body):undefined
-  });
+  const r=await fetch('/api/'+rota,{credentials:'same-origin',
+    headers:opts.body?{'Content-Type':'application/json'}:undefined,...opts,
+    body:opts.body?JSON.stringify(opts.body):undefined});
   let j=null; try{ j=await r.json(); }catch(e){}
-  if(!r.ok){
-    if(r.status===401 && pronto) return location.reload();
-    throw new Error(j?.erro || `Erro ${r.status}`);
-  }
+  if(!r.ok){ if(r.status===401 && pronto) return location.reload(); throw new Error(j?.erro||`Erro ${r.status}`); }
   return j;
 }
 
-/* ---------- projeção (mesma fórmula usada para gerar o mapa) ---------- */
-function proj(lat,lon){
-  const p=MAPA.proj;
-  const my=l=>Math.log(Math.tan(Math.PI/4+l*Math.PI/360))*180/Math.PI;
-  return [ (lon-p.minx)*p.k+p.pad, (p.maxy-my(lat))*p.k+p.pad ];
+/* ---------- mapa (MapLibre + CARTO dark) ---------- */
+function iniciaMapa(){
+  map=new maplibregl.Map({
+    container:'map',
+    style:'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+    center:[-52.5,-14.5], zoom:3.2, attributionControl:{compact:true}
+  });
+  map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');
+  map.on('load',()=>{
+    map.addSource('empresas',{type:'geojson',data:geojson(ultimaLista),
+      cluster:true, clusterRadius:44, clusterMaxZoom:12});
+
+    map.addLayer({id:'clusters',type:'circle',source:'empresas',filter:['has','point_count'],
+      paint:{
+        'circle-color':'#ffb020',
+        'circle-opacity':0.9,
+        'circle-stroke-width':2,'circle-stroke-color':'#0d1014',
+        'circle-radius':['step',['get','point_count'],13,10,17,50,22]
+      }});
+    map.addLayer({id:'clusters-num',type:'symbol',source:'empresas',filter:['has','point_count'],
+      layout:{'text-field':['get','point_count_abbreviated'],'text-size':12,
+        'text-font':['Open Sans Bold','Noto Sans Bold']},
+      paint:{'text-color':'#1a1206'}});
+
+    map.addLayer({id:'ponto',type:'circle',source:'empresas',filter:['!',['has','point_count']],
+      paint:{
+        'circle-color':['match',['get','tipo'],'guincho','#ffb020','parabrisa','#3b9dff','ambos','#31d07a','#c9d4e0'],
+        'circle-radius':7,'circle-stroke-width':1.5,'circle-stroke-color':'#0d1014'
+      }});
+
+    map.on('click','clusters',e=>{
+      const f=map.queryRenderedFeatures(e.point,{layers:['clusters']})[0];
+      map.getSource('empresas').getClusterExpansionZoom(f.properties.cluster_id).then(z=>
+        map.easeTo({center:f.geometry.coordinates,zoom:z}));
+    });
+    map.on('click','ponto',e=>abrePopup(e.features[0]));
+    for(const l of ['clusters','ponto']){
+      map.on('mouseenter',l,()=>map.getCanvas().style.cursor='pointer');
+      map.on('mouseleave',l,()=>map.getCanvas().style.cursor='');
+    }
+    mapaPronto=true; atualizaMapa(ultimaLista);
+  });
+}
+function geojson(lst){
+  return {type:'FeatureCollection',features:lst.map(e=>({
+    type:'Feature',geometry:{type:'Point',coordinates:[e.lon,e.lat]},
+    properties:{id:e.id,nome:e.nome,cidade:e.cidade,uf:e.uf,telefone:e.telefone,tipo:e.tipo}
+  }))};
+}
+function atualizaMapa(lst){
+  ultimaLista=lst;
+  if(mapaPronto && map.getSource('empresas')) map.getSource('empresas').setData(geojson(lst));
+}
+function abrePopup(f){
+  const p=f.properties;
+  if(popup) popup.remove();
+  popup=new maplibregl.Popup({offset:12,maxWidth:'260px'})
+    .setLngLat(f.geometry.coordinates)
+    .setHTML(`<div class="pop"><b>${esc(p.nome)}</b>
+      <div class="lin">${esc(p.cidade)} – ${esc(p.uf)}</div>
+      <div class="lin" style="color:${CORES[p.tipo]}">${ROTULO[p.tipo]}</div>
+      <div style="margin-top:6px">${botaoZap(p.telefone)}</div></div>`)
+    .addTo(map);
+}
+function voaPara(e){
+  if(!mapaPronto) return;
+  map.flyTo({center:[e.lon,e.lat],zoom:12,duration:800});
+  abrePopup({geometry:{type:'Point',coordinates:[e.lon,e.lat]},properties:e});
 }
 
 /* ---------- boot ---------- */
 async function boot(){
-  [MAPA,CIDADES]=await Promise.all([
-    fetch('mapa.json?v=3').then(r=>r.json()),
-    fetch('cidades.json?v=3').then(r=>r.json())   // ?v muda a URL e fura cache antigo; bump ao trocar a base
-  ]);
-  desenhaMapa(); montaSelects();
+  CIDADES=await fetch('cidades.json?v=3').then(r=>r.json());
+  montaSelects(); iniciaMapa();
   const st=await api('status');
   if(st.usuario){ EU=st.usuario; return entrou(); }
   MODO = st.configurado ? 'login' : 'setup';
-  $('#gTxt').textContent = MODO==='setup'
-    ? 'Primeiro acesso: crie a conta de administrador.'
-    : 'Acesso restrito. Entre com seu usuário e senha.';
+  $('#gTxt').textContent = MODO==='setup' ? 'Primeiro acesso: crie a conta de administrador.' : 'Acesso restrito. Entre com seu usuário e senha.';
   $('#gPwd2').style.display = MODO==='setup' ? '' : 'none';
   $('#gBtn').textContent = MODO==='setup' ? 'Criar administrador' : 'Entrar';
   $('#gate').classList.add('on'); $('#gUser').focus();
@@ -277,13 +307,14 @@ async function boot(){
 async function entrou(){
   pronto=true;
   $('#gate').classList.remove('on');
-  $('#quem').textContent = (EU.admin?'👑 ':'👤 ')+EU.usuario;
-  $('#quem').style.color = EU.admin ? '#ffb020' : '#8d99a8';
-  document.querySelector('.tabs button[data-t=add]').hidden = !EU.admin;
-  document.querySelector('.tabs button[data-t=cfg]').hidden = !EU.admin;
+  $('#quem').textContent=(EU.admin?'👑 ':'👤 ')+EU.usuario;
+  $('#quem').style.color=EU.admin?'#ffb020':'#8d99a8';
+  document.querySelector('.tabs button[data-t=add]').hidden=!EU.admin;
+  document.querySelector('.tabs button[data-t=cfg]').hidden=!EU.admin;
   DADOS=await api('empresas');
   if(EU.admin) carregaUsuarios();
   render();
+  if(map) setTimeout(()=>map.resize(),100);
 }
 
 $('#gBtn').onclick=async()=>{
@@ -302,188 +333,10 @@ $('#gBtn').onclick=async()=>{
 ['gUser','gPwd','gPwd2'].forEach(id=>$('#'+id).addEventListener('keydown',e=>{ if(e.key==='Enter') $('#gBtn').click(); }));
 $('#btnSair').onclick=async()=>{ await api('logout',{method:'POST'}); location.reload(); };
 
-/* ---------- mapa ---------- */
-function desenhaMapa(){
-  const s=$('#svgmap');
-  s.setAttribute('viewBox',`0 0 ${VBW} ${MAPA.height}`);
-  let h='<g id="gUf">';
-  for(const uf in MAPA.paths) h+=`<path class="uf" id="uf-${uf}" data-uf="${uf}" d="${MAPA.paths[uf]}"><title>${esc(MAPA.nomes[uf])}</title></path>`;
-  h+='</g><g id="gLbl">';
-  for(const uf in MAPA.labels){
-    const c=MAPA.labels[uf], f=FORA[uf];
-    if(f) h+=`<line class="lead" id="ld-${uf}" x1="${c[0]}" y1="${c[1]}" x2="${f[0]-11}" y2="${f[1]}"/><text class="uflbl fora" id="lb-${uf}" x="${f[0]}" y="${f[1]}">${uf}</text>`;
-    else  h+=`<text class="uflbl" id="lb-${uf}" x="${c[0]}" y="${c[1]}">${uf}</text>`;
-  }
-  h+='</g><g id="gCid"></g><g id="gPt"></g>';
-  s.innerHTML=h;
-  // a sigla acompanha o realce: escura sobre o verde, verde quando fica fora do estado
-  const acende=(uf,on)=>{
-    document.getElementById('lb-'+uf)?.classList.toggle('on', on || ufSel===uf);
-    document.getElementById('ld-'+uf)?.classList.toggle('on', on || ufSel===uf);
-  };
-  s.querySelectorAll('.uf').forEach(p=>{
-    const uf=p.dataset.uf;
-    p.addEventListener('mouseenter',()=>acende(uf,true));
-    p.addEventListener('mouseleave',()=>acende(uf,false));
-    p.addEventListener('click',()=>{
-      ufSel = ufSel===uf ? '' : uf; $('#fUf').value=ufSel; render();
-    });
-  });
-  zoomPan(s);
-}
-/* Pontos com agrupamento por proximidade.
-   Com o Brasil inteiro na tela um estado pequeno tem ~120px: não cabem 18 cidades
-   lado a lado sem virar mancha. Então empresas que cairiam a menos de ~15px umas
-   das outras viram um ponto só com a contagem, e vão se separando conforme o zoom.
-   Os raios também acompanham o zoom, para o ponto ter sempre o mesmo tamanho na tela. */
-let ESCALA=1, zoomPara=null;
-const R_SOLO=3.6, R_GRUPO=5.6, CELULA=19;
-
-/* Crescimento amortecido dos pontos com o zoom.
-   ESCALA = viewBox atual / viewBox original (1 sem zoom, 1/14 no zoom máximo).
-   Se o raio fosse fixo em unidades do mapa, o ponto cresceria junto com o mapa
-   e viraria uma bola gigante; se fosse ESCALA puro, ficaria sempre do mesmo
-   tamanho na tela. Com ESCALA^0.7 ele cresce, mas devagar: ~2,2x no zoom máximo. */
-const fator = () => Math.pow(ESCALA, 0.7);
-
-function agrupa(){
-  const cel=CELULA*ESCALA, mapa=new Map();
-  DADOS.forEach(e=>{
-    const [x,y]=proj(e.lat,e.lon);
-    const k=Math.floor(x/cel)+':'+Math.floor(y/cel);
-    if(!mapa.has(k)) mapa.set(k,{itens:[],sx:0,sy:0});
-    const g=mapa.get(k); g.itens.push(e); g.sx+=x; g.sy+=y;
-  });
-  return [...mapa.values()].map(g=>({
-    itens:g.itens, n:g.itens.length,
-    x:g.sx/g.itens.length, y:g.sy/g.itens.length,
-    cidades:[...new Set(g.itens.map(i=>i.cidade))]
-  }));
-}
-
-function desenhaPontos(){
-  const g=$('#gPt'), grupos=agrupa(), f=fator();
-  g.innerHTML=grupos.map((c,i)=>{
-    const tipos=[...new Set(c.itens.map(a=>a.tipo))];
-    const cor = tipos.length===1 ? CORES[tipos[0]] : '#c9d4e0';   // grupo com tipos variados
-    const r=(c.n>1?R_GRUPO:R_SOLO)*f;
-    const forte=c.itens.some(a=>a.id===destaque);
-    return `<circle class="pt${forte?' hl':''}" data-i="${i}" cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}"
-             r="${r.toFixed(2)}" fill="${cor}" stroke-width="${(1.1*f).toFixed(2)}"/>`
-      + (c.n>1?`<text class="ptn" x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" font-size="${(6*f).toFixed(2)}">${c.n}</text>`:'');
-  }).join('');
-
-  g.querySelectorAll('.pt').forEach(el=>{
-    const c=grupos[+el.dataset.i];
-    el.addEventListener('mouseenter',ev=>{
-      const w=$('#mapwrap').getBoundingClientRect(), t=$('#tip'), e=c.itens[0];
-      t.style.display='block';
-      t.innerHTML = c.n===1
-        ? `<b>${esc(e.nome)}</b><br>${esc(e.cidade)} – ${e.uf}<br>${esc(e.telefone)}<br><span style="color:${CORES[e.tipo]}">${ROTULO[e.tipo]}</span>`
-        : `<b>${c.n} empresas</b><br><span style="color:#8d99a8">${esc(c.cidades.slice(0,3).join(', '))}${c.cidades.length>3?` +${c.cidades.length-3}`:''}</span><br>`
-          + c.itens.slice(0,4).map(a=>`<span style="color:${CORES[a.tipo]}">•</span> ${esc(a.nome)}`).join('<br>')
-          + (c.n>4?`<br><span style="color:#8d99a8">e mais ${c.n-4}…</span>`:'');
-      t.style.left=Math.min(ev.clientX-w.left+12,w.width-270)+'px'; t.style.top=(ev.clientY-w.top+12)+'px';
-    });
-    el.addEventListener('mouseleave',()=>$('#tip').style.display='none');
-    el.addEventListener('click',()=>{
-      if(c.n===1){
-        destaque=c.itens[0].id; render();
-        document.getElementById('card-'+destaque)?.scrollIntoView({block:'center',behavior:'smooth'});
-      } else if(c.cidades.length===1){
-        $('#q').value=c.cidades[0]; destaque=null; render();   // já é uma cidade só: filtra a lista
-      } else {
-        zoomPara && zoomPara(c.x,c.y);                          // várias cidades: aproxima e separa
-      }
-    });
-  });
-}
-
-/* Nomes das cidades — no estilo do Google Maps: poucos, bem espaçados,
-   priorizando as cidades maiores. Só aparecem quando você entra num estado.
-   Como:
-   1) só desenha se o zoom passou do limiar (viewBox < ~1,5 estado);
-   2) corte por área visível — ignora quem está fora da tela;
-   3) ordena por população (maior primeiro) e vai colocando os nomes;
-   4) colisão retangular: um nome só entra se a caixa dele não toca nenhuma
-      já colocada. Assim capital e cidades grandes ganham o rótulo, e o resto
-      só aparece quando há espaço — nunca dois nomes sobrepostos. */
-const LIMIAR_CID = 0.40, MAX_CID = 180;
-function desenhaCidades(){
-  const g=$('#gCid'); if(!g) return;
-  if(!pronto || ESCALA > LIMIAR_CID){ if(g.firstChild) g.textContent=''; return; }
-  const vb=$('#svgmap').getAttribute('viewBox').split(' ').map(Number);
-  const [x0,y0,w,hh]=vb, x1=x0+w, y1=y0+hh, mg=w*0.05;
-  const fs=8.5*ESCALA;                                 // ~constante na tela
-
-  const vis=[];
-  for(const uf in CIDADES.cidades){
-    for(const c of CIDADES.cidades[uf]){
-      const p=proj(c[1],c[2]);
-      if(p[0]<x0-mg||p[0]>x1+mg||p[1]<y0-mg||p[1]>y1+mg) continue;
-      vis.push([c[3]||0, p[0], p[1], c[0]]);           // [pop, x, y, nome]
-    }
-  }
-  vis.sort((a,b)=>b[0]-a[0]);                           // maior população primeiro
-
-  // grade de ocupação para a colisão; célula com folga para os nomes respirarem
-  const cel=fs*2.0, ocup=new Set(), gc=v=>Math.floor(v/cel);
-  let out='', n=0;
-  for(const [,px,py,nome] of vis){
-    if(n>=MAX_CID) break;
-    const halfW=nome.length*fs*0.30 + fs*1.0;          // meia-largura do rótulo
-    const bx0=gc(px-halfW), bx1=gc(px+halfW), by0=gc(py-fs*0.3), by1=gc(py+fs*1.6);
-    let toca=false;
-    for(let gx=bx0; gx<=bx1 && !toca; gx++) for(let gy=by0; gy<=by1; gy++){ if(ocup.has(gx+':'+gy)){ toca=true; break; } }
-    if(toca) continue;
-    for(let gx=bx0; gx<=bx1; gx++) for(let gy=by0; gy<=by1; gy++) ocup.add(gx+':'+gy);
-    out+=`<circle class="cidpt" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(0.7*ESCALA).toFixed(2)}"/>`
-       + `<text class="cid" x="${px.toFixed(1)}" y="${(py+fs*0.85).toFixed(1)}" font-size="${fs.toFixed(2)}" stroke-width="${(0.5*ESCALA).toFixed(2)}">${esc(nome)}</text>`;
-    n++;
-  }
-  g.innerHTML=out;
-}
-
-function zoomPan(svg){
-  let vb=[0,0,VBW,MAPA.height]; const base=vb.slice(); let drag=null, pendente=null, pendCid=null;
-  const set=()=>{
-    svg.setAttribute('viewBox',vb.join(' '));
-    const nova=vb[2]/base[2];
-    if(nova!==ESCALA){                       // só reagrupa quando o zoom muda, não ao arrastar
-      ESCALA=nova;
-      // setTimeout e não requestAnimationFrame: o navegador congela o rAF em aba
-      // de segundo plano, e o mapa ficaria com o agrupamento velho ao voltar.
-      clearTimeout(pendente);
-      pendente=setTimeout(()=>{ if(pronto) desenhaPontos(); },16);
-    }
-    // os nomes de cidade dependem da área visível, então atualizam também ao arrastar
-    clearTimeout(pendCid);
-    pendCid=setTimeout(desenhaCidades,45);
-  };
-  const zoom=(f,cx,cy)=>{
-    const nw=Math.min(base[2],Math.max(base[2]/14,vb[2]*f)), nh=nw*base[3]/base[2];
-    vb[0]+=(cx-vb[0])*(1-nw/vb[2]); vb[1]+=(cy-vb[1])*(1-nh/vb[3]); vb[2]=nw; vb[3]=nh; set();
-  };
-  // clicar num grupo de várias cidades aproxima até separá-las
-  zoomPara=(x,y)=>{
-    const nw=Math.max(base[2]/14,vb[2]/2.6), nh=nw*base[3]/base[2];
-    vb=[x-nw/2, y-nh/2, nw, nh]; set();
-  };
-  const pt=e=>{const r=svg.getBoundingClientRect();return [vb[0]+(e.clientX-r.left)/r.width*vb[2], vb[1]+(e.clientY-r.top)/r.height*vb[3]];};
-  svg.addEventListener('wheel',e=>{e.preventDefault();const[cx,cy]=pt(e);zoom(e.deltaY>0?1.15:0.87,cx,cy)},{passive:false});
-  svg.addEventListener('mousedown',e=>{drag=[e.clientX,e.clientY,vb[0],vb[1]];svg.classList.add('drag')});
-  addEventListener('mousemove',e=>{ if(!drag)return; const r=svg.getBoundingClientRect();
-    vb[0]=drag[2]-(e.clientX-drag[0])/r.width*vb[2]; vb[1]=drag[3]-(e.clientY-drag[1])/r.height*vb[3]; set(); });
-  addEventListener('mouseup',()=>{drag=null;svg.classList.remove('drag')});
-  $('#zin').onclick=()=>zoom(0.75,vb[0]+vb[2]/2,vb[1]+vb[3]/2);
-  $('#zout').onclick=()=>zoom(1.33,vb[0]+vb[2]/2,vb[1]+vb[3]/2);
-  $('#zreset').onclick=()=>{vb=base.slice();set()};
-}
-
 /* ---------- UI ---------- */
 function montaSelects(){
-  const ufs=Object.keys(MAPA.nomes).sort();
-  const opts=ufs.map(u=>`<option value="${u}">${u} – ${esc(MAPA.nomes[u])}</option>`).join('');
+  const ufs=Object.keys(UFNOMES).sort();
+  const opts=ufs.map(u=>`<option value="${u}">${u} – ${esc(UFNOMES[u])}</option>`).join('');
   $('#fUf').innerHTML='<option value="">Todos os estados</option>'+opts;
   $('#aUf').innerHTML='<option value="">— selecione —</option>'+opts;
   $('#aUf').onchange=()=>{
@@ -497,18 +350,11 @@ function montaSelects(){
 function render(){
   if(!pronto) return;
   $('#cnt').textContent=DADOS.length+(DADOS.length===1?' empresa':' empresas');
-  document.querySelectorAll('.uf').forEach(p=>{
-    const uf=p.dataset.uf, sel=uf===ufSel;
-    p.classList.toggle('sel',sel);
-    p.classList.toggle('has',DADOS.some(d=>d.uf===uf));
-    document.getElementById('lb-'+uf)?.classList.toggle('on',sel);
-    document.getElementById('ld-'+uf)?.classList.toggle('on',sel);
-  });
-  desenhaPontos();
   const qs=norm($('#q').value), t=$('#fTipo').value;
   const lst=DADOS.filter(e=>(!ufSel||e.uf===ufSel)&&(!t||e.tipo===t)&&
     (!qs||norm(e.nome+' '+e.cidade+' '+e.telefone+' '+e.uf).includes(qs)))
     .sort((a,b)=>a.uf.localeCompare(b.uf)||a.cidade.localeCompare(b.cidade)||a.nome.localeCompare(b.nome));
+  atualizaMapa(lst);
   $('#lista').innerHTML = lst.length ? lst.map(e=>`
     <div class="card" id="card-${e.id}" data-id="${e.id}" style="${destaque===e.id?'border-color:var(--acc)':''}">
       <div class="n"><i style="background:${CORES[e.tipo]}"></i>${esc(e.nome)}</div>
@@ -517,8 +363,10 @@ function render(){
         ${EU.admin?`<button class="danger rm" data-id="${e.id}" style="padding:2px 8px;font-size:11px">remover</button>`:''}</div>
     </div>`).join('') : `<div class="empty">Nenhuma empresa encontrada.${EU.admin?'<br>Use a aba <b>Adicionar</b>.':''}</div>`;
   $('#lista').querySelectorAll('.card').forEach(c=>c.onclick=ev=>{
-    if(ev.target.closest('.rm,.zap'))return;   // não sequestra o clique do botão de WhatsApp
-    destaque=c.dataset.id; render();
+    if(ev.target.closest('.rm,.zap'))return;
+    destaque=c.dataset.id;
+    const e=DADOS.find(d=>d.id===destaque); if(e) voaPara(e);
+    render();
   });
   $('#lista').querySelectorAll('.rm').forEach(b=>b.onclick=async ev=>{
     ev.stopPropagation();
@@ -589,8 +437,7 @@ async function trocaSenha(id,u){
 /* ---------- backup ---------- */
 $('#btnExport').onclick=()=>{
   const b=new Blob([JSON.stringify(DADOS,null,1)],{type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(b);
-  a.download='empresas-backup.json'; a.click();
+  const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='empresas-backup.json'; a.click();
 };
 $('#fImport').onchange=async e=>{
   const f=e.target.files[0]; if(!f)return; const M=$('#impMsg');
