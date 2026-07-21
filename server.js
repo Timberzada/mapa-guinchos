@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { usuarios, empresas } from './db.js';
+import { usuarios, empresas, salva } from './db.js';
 import { criaToken, defineCookie, limpaCookie, sessao, exigeLogin, exigeAdmin } from './auth.js';
 
 const raiz = path.dirname(fileURLToPath(import.meta.url));
@@ -183,6 +183,24 @@ app.use((err, _req, res, _next) => {
   console.error(err);
   res.status(500).json({ erro: 'Erro interno.' });
 });
+
+/* ---------- realinha empresas antigas com a base de municípios ----------
+   A base original (GeoNames) não cobria todos os municípios: os que faltavam
+   caíam no centro do estado. Trocada pela lista completa do IBGE, este passo
+   recoloca no lugar certo quem já estava cadastrado. É idempotente. */
+{
+  const lista = empresas.lista();
+  let movidas = 0;
+  for (const e of lista) {
+    const c = achaCidade(e.uf, e.cidade);
+    if (!c) { console.warn(`[mapa] cidade não encontrada na base: ${e.cidade}-${e.uf} (${e.nome})`); continue; }
+    if (c[1] !== e.lat || c[2] !== e.lon || c[0] !== e.cidade) {
+      e.cidade = c[0]; e.lat = c[1]; e.lon = c[2];   // usa a grafia oficial do IBGE
+      movidas++;
+    }
+  }
+  if (movidas) { salva(); console.log(`[mapa] ${movidas} empresa(s) reposicionada(s) na base do IBGE.`); }
+}
 
 /* ---------- admin inicial por variável de ambiente (opcional) ---------- */
 if (process.env.ADMIN_USUARIO && process.env.ADMIN_SENHA && usuarios.total() === 0) {
