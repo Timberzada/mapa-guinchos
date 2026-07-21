@@ -305,6 +305,9 @@ function montaCamadas(){
     }
   }
   mapaPronto=true; atualizaMapa(ultimaLista);
+  // alguns navegadores não pintam o primeiro frame até haver interação;
+  // um resize + micro-ajuste de zoom força a primeira renderização.
+  setTimeout(()=>{ map.resize(); map.jumpTo({center:map.getCenter(),zoom:map.getZoom()+0.001}); },250);
 }
 function geojson(lst){
   return {type:'FeatureCollection',features:lst.map(e=>({
