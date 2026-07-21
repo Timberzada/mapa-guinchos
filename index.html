@@ -40,6 +40,8 @@ main{display:grid;grid-template-columns:1fr 380px;height:calc(100vh - 53px)}
 .pt:hover{stroke:#fff}
 .pt.hl{stroke:#fff}
 .ptn{fill:#10240f;font-weight:700;pointer-events:none;text-anchor:middle;dominant-baseline:central}
+.cid{fill:#7b8794;font-weight:400;pointer-events:none;text-anchor:middle;dominant-baseline:hanging;paint-order:stroke;stroke:#0f1216;stroke-width:.5}
+.cidpt{fill:#586472;pointer-events:none}
 #tip{position:absolute;pointer-events:none;background:#0b0e12ee;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;display:none;max-width:260px;z-index:5;box-shadow:0 6px 20px #0008}
 #tip b{color:var(--acc)}
 #zoomui{position:absolute;left:12px;bottom:12px;display:flex;flex-direction:column;gap:6px}
@@ -312,7 +314,7 @@ function desenhaMapa(){
     if(f) h+=`<line class="lead" id="ld-${uf}" x1="${c[0]}" y1="${c[1]}" x2="${f[0]-11}" y2="${f[1]}"/><text class="uflbl fora" id="lb-${uf}" x="${f[0]}" y="${f[1]}">${uf}</text>`;
     else  h+=`<text class="uflbl" id="lb-${uf}" x="${c[0]}" y="${c[1]}">${uf}</text>`;
   }
-  h+='</g><g id="gPt"></g>';
+  h+='</g><g id="gCid"></g><g id="gPt"></g>';
   s.innerHTML=h;
   // a sigla acompanha o realce: escura sobre o verde, verde quando fica fora do estado
   const acende=(uf,on)=>{
@@ -396,8 +398,38 @@ function desenhaPontos(){
     });
   });
 }
+
+/* Nomes das cidades — aparecem só quando você entra num estado.
+   Três cuidados para não travar nem poluir com 5.571 nomes:
+   1) só desenha se o zoom passou do limiar (viewBox menor que ~1-2 estados);
+   2) corte por área visível: ignora quem está fora da tela;
+   3) afinamento por densidade: no máximo um nome por célula da tela, então
+      onde as cidades são coladas mostra parte; quanto mais perto, mais nomes. */
+const LIMIAR_CID = 0.42;
+function desenhaCidades(){
+  const g=$('#gCid'); if(!g) return;
+  if(!pronto || ESCALA > LIMIAR_CID){ if(g.firstChild) g.textContent=''; return; }
+  const vb=$('#svgmap').getAttribute('viewBox').split(' ').map(Number);
+  const [x0,y0,w,hh]=vb, x1=x0+w, y1=y0+hh, mg=w*0.03;
+  const fs=9*ESCALA;                                   // ~constante na tela
+  const celX=w*0.060, celY=w*0.017;                    // ~1 nome a cada 65x18 px
+  const usadas=new Set();
+  let out='';
+  for(const uf in CIDADES.cidades){
+    for(const c of CIDADES.cidades[uf]){
+      const p=proj(c[1],c[2]);
+      if(p[0]<x0-mg||p[0]>x1+mg||p[1]<y0-mg||p[1]>y1+mg) continue;
+      const k=((p[0]-x0)/celX|0)+':'+((p[1]-y0)/celY|0);
+      if(usadas.has(k)) continue; usadas.add(k);
+      out+=`<circle class="cidpt" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${(0.7*ESCALA).toFixed(2)}"/>`
+         + `<text class="cid" x="${p[0].toFixed(1)}" y="${(p[1]+fs*0.9).toFixed(1)}" font-size="${fs.toFixed(2)}" stroke-width="${(0.5*ESCALA).toFixed(2)}">${esc(c[0])}</text>`;
+    }
+  }
+  g.innerHTML=out;
+}
+
 function zoomPan(svg){
-  let vb=[0,0,VBW,MAPA.height]; const base=vb.slice(); let drag=null, pendente=null;
+  let vb=[0,0,VBW,MAPA.height]; const base=vb.slice(); let drag=null, pendente=null, pendCid=null;
   const set=()=>{
     svg.setAttribute('viewBox',vb.join(' '));
     const nova=vb[2]/base[2];
@@ -408,6 +440,9 @@ function zoomPan(svg){
       clearTimeout(pendente);
       pendente=setTimeout(()=>{ if(pronto) desenhaPontos(); },16);
     }
+    // os nomes de cidade dependem da área visível, então atualizam também ao arrastar
+    clearTimeout(pendCid);
+    pendCid=setTimeout(desenhaCidades,45);
   };
   const zoom=(f,cx,cy)=>{
     const nw=Math.min(base[2],Math.max(base[2]/14,vb[2]*f)), nh=nw*base[3]/base[2];
