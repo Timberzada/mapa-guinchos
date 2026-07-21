@@ -259,8 +259,8 @@ function proj(lat,lon){
 /* ---------- boot ---------- */
 async function boot(){
   [MAPA,CIDADES]=await Promise.all([
-    fetch('mapa.json').then(r=>r.json()),
-    fetch('cidades.json').then(r=>r.json())
+    fetch('mapa.json?v=3').then(r=>r.json()),
+    fetch('cidades.json?v=3').then(r=>r.json())   // ?v muda a URL e fura cache antigo; bump ao trocar a base
   ]);
   desenhaMapa(); montaSelects();
   const st=await api('status');
