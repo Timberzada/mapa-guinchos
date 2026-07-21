@@ -47,6 +47,7 @@ aside{background:var(--panel);border-left:1px solid var(--line);display:flex;fle
 .tabs{display:flex;border-bottom:1px solid var(--line)}
 .tabs button{flex:1;border:0;border-radius:0;background:transparent;color:var(--mut);padding:11px}
 .tabs button.on{color:var(--txt);box-shadow:inset 0 -2px 0 var(--acc)}
+.tabs button[hidden]{display:none}
 .pane{display:none;padding:12px;overflow:auto;flex:1}
 .pane.on{display:block}
 label{display:block;font-size:12px;color:var(--mut);margin:10px 0 4px}
@@ -57,23 +58,25 @@ label{display:block;font-size:12px;color:var(--mut);margin:10px 0 4px}
 .card:hover{border-color:#3d4854}
 .card .n{font-weight:650;display:flex;align-items:center;gap:6px}
 .card .n i{width:9px;height:9px;border-radius:99px;flex:0 0 auto}
-.card .m{color:var(--mut);font-size:12px;margin-top:3px;display:flex;justify-content:space-between;gap:8px}
+.card .m{color:var(--mut);font-size:12px;margin-top:3px;display:flex;justify-content:space-between;gap:8px;align-items:center}
 .card a{color:var(--acc2);text-decoration:none}
 .empty{color:var(--mut);text-align:center;padding:30px 10px;font-size:13px}
 .hint{color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.5}
 .ok{color:#31d07a}.err{color:#ff8080}
 #msg{font-size:12px;margin-top:10px;min-height:16px}
-hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 code{background:#0b0e12;padding:1px 5px;border-radius:4px;font-size:12px}
 h3{font-size:13px;margin:0 0 2px;letter-spacing:.3px;text-transform:uppercase;color:var(--acc)}
 .box{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+label.ck{display:flex;align-items:center;gap:8px;margin-top:10px;color:var(--txt)}
+label.ck input{width:auto}
 #gate{position:fixed;inset:0;background:#0b0e12;z-index:50;display:none;align-items:center;justify-content:center;padding:20px}
 #gate.on{display:flex}
 #gate .g{width:100%;max-width:360px;text-align:center}
 #gate .lk{font-size:44px;margin-bottom:10px}
 #gate h2{font-size:19px;margin:0 0 6px}
 #gate p{color:var(--mut);font-size:13px;margin:0 0 20px}
-#gate input{width:100%;text-align:center;padding:11px;font-size:15px}
+#gate input{width:100%;padding:11px;font-size:15px;text-align:center}
+#gate input+input{margin-top:8px}
 #gate button{width:100%;margin-top:10px;padding:11px}
 #gateMsg{font-size:12.5px;min-height:18px;margin-top:10px}
 </style>
@@ -86,7 +89,8 @@ h3{font-size:13px;margin:0 0 2px;letter-spacing:.3px;text-transform:uppercase;co
     <h2>Mapa de Guinchos &amp; Para-brisas</h2>
     <p id="gTxt">Acesso restrito. Entre com seu usuário e senha.</p>
     <input id="gUser" placeholder="Usuário" autocomplete="username">
-    <input id="gPwd" type="password" placeholder="Senha" autocomplete="current-password" style="margin-top:8px">
+    <input id="gPwd" type="password" placeholder="Senha" autocomplete="current-password">
+    <input id="gPwd2" type="password" placeholder="Repetir senha" autocomplete="new-password" style="display:none">
     <button class="primary" id="gBtn">Entrar</button>
     <div id="gateMsg"></div>
   </div>
@@ -95,12 +99,10 @@ h3{font-size:13px;margin:0 0 2px;letter-spacing:.3px;text-transform:uppercase;co
 <header>
   <h1>🚨 Mapa de Guinchos &amp; Para-brisas</h1>
   <span class="badge" id="cnt">0 empresas</span>
-  <span class="badge" id="src">carregando…</span>
-  <span class="badge" id="secBadge" style="display:none"></span>
+  <span class="badge" id="quem"></span>
   <span class="sp"></span>
-  <button id="btnLock" style="display:none">🔒 Bloquear</button>
   <button id="btnExport">Exportar JSON</button>
-  <button id="btnAdmin">🔑 Admin</button>
+  <button id="btnSair">Sair</button>
 </header>
 
 <main>
@@ -122,8 +124,8 @@ h3{font-size:13px;margin:0 0 2px;letter-spacing:.3px;text-transform:uppercase;co
   <aside>
     <div class="tabs">
       <button class="on" data-t="lista">Lista</button>
-      <button data-t="add">Adicionar</button>
-      <button data-t="cfg">Config</button>
+      <button data-t="add" hidden>Adicionar</button>
+      <button data-t="cfg" hidden>Usuários</button>
     </div>
 
     <div class="pane on" id="p-lista">
@@ -161,279 +163,118 @@ h3{font-size:13px;margin:0 0 2px;letter-spacing:.3px;text-transform:uppercase;co
         <button id="btnLimpar" style="flex:0 0 auto">Limpar</button>
       </div>
       <div id="msg"></div>
-      <div class="hint">A cidade define a posição exata do ponto no mapa (base IBGE + coordenadas GeoNames).</div>
+      <div class="hint">A cidade define a posição do ponto no mapa e é validada no servidor (base IBGE + GeoNames).</div>
     </div>
 
     <div class="pane" id="p-cfg">
-
       <div class="box">
-        <h3>1 · Repositório</h3>
-        <div class="hint" style="margin-top:0">Onde o arquivo <code>empresas.json</code> é gravado.</div>
-        <label>Usuário/Org do GitHub</label>
-        <input class="f" id="cOwner" placeholder="Timberzada">
-        <label>Repositório</label>
-        <input class="f" id="cRepo" placeholder="mapa-guinchos">
+        <h3>Usuários</h3>
+        <div class="hint" style="margin-top:0">Quem pode entrar no sistema. Administradores também cadastram empresas e gerenciam contas.</div>
+        <div id="listaUsers" style="margin-top:10px"></div>
+        <label>Novo usuário</label>
         <div class="row">
-          <div><label>Branch</label><input class="f" id="cBranch" placeholder="main"></div>
-          <div><label>Arquivo</label><input class="f" id="cPath" placeholder="empresas.json"></div>
+          <input class="f" id="cUN" placeholder="usuário" autocomplete="off">
+          <input class="f" id="cUP" type="password" placeholder="senha (8+)" autocomplete="new-password">
         </div>
-        <div style="margin-top:12px"><button id="btnRepoSave">Salvar repositório</button></div>
-      </div>
-
-      <div class="box">
-        <h3>2 · Admin (token)</h3>
-        <div class="hint" style="margin-top:0">O token do GitHub é guardado <b>criptografado</b> neste navegador e só abre com a senha de admin.</div>
-        <div id="admLocked">
-          <label>Senha de admin</label>
-          <input class="f" id="cAdmPwd" type="password" placeholder="sua senha de admin" autocomplete="off">
-          <label>Token do GitHub (só na primeira vez)</label>
-          <input class="f" id="cToken" type="password" placeholder="github_pat_… (deixe vazio se já salvou)" autocomplete="off">
-          <div class="row" style="margin-top:12px">
-            <button class="primary" id="btnAdmUnlock">Destravar admin</button>
-            <button class="danger" id="btnAdmForget" style="flex:0 0 auto">Esquecer</button>
-          </div>
-        </div>
-        <div id="admOpen" style="display:none">
-          <div class="ok" style="font-size:12.5px">✓ Modo admin ativo — as alterações são gravadas no GitHub.</div>
-          <div style="margin-top:10px"><button id="btnAdmLock">Travar admin</button></div>
-        </div>
-        <div id="admMsg" style="font-size:12px;margin-top:10px"></div>
-      </div>
-
-      <div class="box">
-        <h3>3 · Login e usuários</h3>
-
-        <div id="loginOff">
-          <div class="hint" style="margin-top:0">Ativa a tela de login e criptografa a lista no repositório. Sem login ninguém lê o arquivo, nem baixando direto do GitHub. Requer modo admin ativo.</div>
-          <label>Primeiro usuário</label>
-          <input class="f" id="cU1" placeholder="ex.: felipe" autocomplete="off">
-          <label>Senha</label>
-          <input class="f" id="cP1" type="password" placeholder="mínimo 8 caracteres" autocomplete="new-password">
-          <label>Repetir senha</label>
-          <input class="f" id="cP2" type="password" autocomplete="new-password">
-          <div style="margin-top:12px"><button class="primary" id="btnLoginOn">Ativar login</button></div>
-        </div>
-
-        <div id="loginOn" style="display:none">
-          <div class="hint" style="margin-top:0">Usuários que podem entrar no site. Remover alguém não afeta a senha dos demais.</div>
-          <div id="listaUsers" style="margin-top:10px"></div>
-          <hr>
-          <label style="margin-top:0">Novo usuário</label>
-          <div class="row">
-            <input class="f" id="cUN" placeholder="usuário" autocomplete="off">
-            <input class="f" id="cUP" type="password" placeholder="senha" autocomplete="new-password">
-          </div>
-          <div class="row" style="margin-top:12px">
-            <button class="primary" id="btnUserAdd">Adicionar usuário</button>
-            <button class="danger" id="btnLoginOff" style="flex:0 0 auto">Desativar login</button>
-          </div>
-        </div>
+        <label class="ck"><input type="checkbox" id="cUA"> Administrador</label>
+        <div style="margin-top:12px"><button class="primary" id="btnUserAdd">Adicionar usuário</button></div>
         <div id="accMsg" style="font-size:12px;margin-top:10px"></div>
       </div>
 
       <div class="box">
-        <h3>4 · Backup</h3>
-        <label style="margin-top:0">Importar backup (.json)</label>
+        <h3>Backup</h3>
+        <div class="hint" style="margin-top:0">Importar substitui toda a lista atual.</div>
+        <label>Importar backup (.json)</label>
         <input class="f" type="file" id="fImport" accept="application/json">
         <div id="impMsg" style="font-size:12px;margin-top:10px"></div>
-      </div>
-
-      <div class="hint">
-        <b>Token:</b> GitHub → Settings → Developer settings → Personal access tokens → Fine-grained → só este repositório, permissão <code>Contents: Read and write</code>.<br>
-        <b>Aviso:</b> a segurança da lista depende inteiramente da força da senha de acesso — use uma senha longa. Quem tiver a senha consegue ler tudo.
       </div>
     </div>
   </aside>
 </main>
 
 <script>
-const LS_CFG='mapaGuinchos.cfg', LS_TOK='mapaGuinchos.tok', LS_CACHE='mapaGuinchos.cache';
 const CORES={guincho:'#ffb020',parabrisa:'#3b9dff',ambos:'#31d07a'};
 const ROTULO={guincho:'Guincho',parabrisa:'Para-brisa',ambos:'Guincho + Para-brisa'};
 const FORA={RN:[965,262],PB:[965,296],PE:[965,330],AL:[965,364],SE:[965,398],ES:[930,576],RJ:[930,668],DF:[648,462]};
-const VBW=1010, ITER=310000;
+const VBW=1010;
 
-let MAPA=null, CIDADES=null, DADOS=[], cfg=carregaCfg();
-let DKEY=null;                 // chave AES dos dados (null = arquivo em texto puro)
-let DKRAW=null;                // chave crua, para embrulhar de novo por usuário
-let DKDF=null;                 // params do formato antigo (v1, senha única)
-let USUARIOS=[], USER=null, VER=0;
-let TOKEN=null;                // token destravado em memória
-let sha=null, ufSel='', destaque=null, pronto=false;
+let MAPA=null, CIDADES=null, DADOS=[], EU=null, MODO='login';
+let ufSel='', destaque=null, pronto=false;
 const $=s=>document.querySelector(s);
 
-/* ================= cripto ================= */
-const enc=new TextEncoder(), dec=new TextDecoder();
-const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
-const unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
-async function derive(pwd,salt,iter){
-  const base=await crypto.subtle.importKey('raw',enc.encode(pwd),'PBKDF2',false,['deriveKey']);
-  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:iter,hash:'SHA-256'},base,
-    {name:'AES-GCM',length:256},false,['encrypt','decrypt']);
-}
-async function cifra(obj,key){
-  const iv=crypto.getRandomValues(new Uint8Array(12));
-  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(JSON.stringify(obj)));
-  return {iv:b64(iv),ct:b64(ct)};
-}
-async function decifra(pack,key){
-  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(pack.iv)},key,unb64(pack.ct));
-  return JSON.parse(dec.decode(pt));
-}
-function novoKdf(){ return {salt:b64(crypto.getRandomValues(new Uint8Array(16))),iter:ITER}; }
-const kdfKey=(pwd,kdf)=>derive(pwd,unb64(kdf.salt),kdf.iter);
-const importDK=raw=>crypto.subtle.importKey('raw',raw,'AES-GCM',false,['encrypt','decrypt']);
-// embrulha a chave dos dados com a senha de um usuário
-async function embrulha(usuario,pwd,rawDK){
-  const kdf=novoKdf(); const k=await kdfKey(pwd,kdf); const p=await cifra(b64(rawDK),k);
-  return {u:usuario,kdf,iv:p.iv,ct:p.ct};
-}
-async function desembrulha(rec,pwd){
-  const k=await kdfKey(pwd,rec.kdf);
-  return unb64(await decifra(rec,k));
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+const msg=(el,t,cls)=>{ el.className=cls||''; el.textContent=t; };
+
+async function api(rota,opts={}){
+  const r=await fetch('/api/'+rota,{
+    credentials:'same-origin',
+    headers:opts.body?{'Content-Type':'application/json'}:undefined,
+    ...opts,
+    body:opts.body?JSON.stringify(opts.body):undefined
+  });
+  let j=null; try{ j=await r.json(); }catch(e){}
+  if(!r.ok){
+    if(r.status===401 && pronto) return location.reload();
+    throw new Error(j?.erro || `Erro ${r.status}`);
+  }
+  return j;
 }
 
-/* ================= util ================= */
-function carregaCfg(){ try{return JSON.parse(localStorage.getItem(LS_CFG))||{}}catch(e){return {}} }
-function salvaCfg(){ localStorage.setItem(LS_CFG,JSON.stringify(cfg)); }
-function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-function norm(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
-function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
-function msg(el,t,cls){ el.className=cls||''; el.textContent=t; }
-
-/* ================= projeção ================= */
+/* ---------- projeção (mesma fórmula usada para gerar o mapa) ---------- */
 function proj(lat,lon){
   const p=MAPA.proj;
   const my=l=>Math.log(Math.tan(Math.PI/4+l*Math.PI/360))*180/Math.PI;
   return [ (lon-p.minx)*p.k+p.pad, (p.maxy-my(lat))*p.k+p.pad ];
 }
 
-/* ================= boot ================= */
+/* ---------- boot ---------- */
 async function boot(){
   [MAPA,CIDADES]=await Promise.all([
     fetch('mapa.json').then(r=>r.json()),
     fetch('cidades.json').then(r=>r.json())
   ]);
-  desenhaMapa(); montaSelects(); preencheCfg();
-  await carregaDados();
+  desenhaMapa(); montaSelects();
+  const st=await api('status');
+  if(st.usuario){ EU=st.usuario; return entrou(); }
+  MODO = st.configurado ? 'login' : 'setup';
+  $('#gTxt').textContent = MODO==='setup'
+    ? 'Primeiro acesso: crie a conta de administrador.'
+    : 'Acesso restrito. Entre com seu usuário e senha.';
+  $('#gPwd2').style.display = MODO==='setup' ? '' : 'none';
+  $('#gBtn').textContent = MODO==='setup' ? 'Criar administrador' : 'Entrar';
+  $('#gate').classList.add('on'); $('#gUser').focus();
 }
 
-async function buscaArquivo(){
-  if(cfg.owner&&cfg.repo){
-    try{
-      const r=await api('GET');
-      if(r.ok){
-        const j=await r.json(); sha=j.sha;
-        $('#src').textContent='GitHub · '+cfg.repo; $('#src').style.color='#31d07a';
-        return JSON.parse(dec.decode(unb64(j.content.replace(/\n/g,''))));
-      }
-    }catch(e){}
-  }
-  try{
-    const r=await fetch((cfg.path||'empresas.json')+'?t='+Date.now(),{cache:'no-store'});
-    if(r.ok){ $('#src').textContent='arquivo do site'; return await r.json(); }
-  }catch(e){}
-  $('#src').textContent='só neste navegador';
-  return JSON.parse(localStorage.getItem(LS_CACHE)||'[]');
-}
-
-let PACK=null;
-async function carregaDados(){
-  const raw=await buscaArquivo();
-  if(raw && raw.cifrado){
-    PACK=raw; VER=raw.cifrado;
-    USUARIOS=raw.usuarios||[]; DKDF=raw.kdf||null;
-    const v1 = VER===1;
-    $('#gUser').style.display = v1?'none':'';
-    $('#gTxt').textContent = v1 ? 'Conteúdo protegido. Informe a senha de acesso.'
-                                : 'Acesso restrito. Entre com seu usuário e senha.';
-    const s=sessionStorage.getItem('mapaGuinchos.sess');
-    if(s){ try{ await abreSessao(unb64(s)); return; }catch(e){ sessionStorage.removeItem('mapaGuinchos.sess'); } }
-    $('#gate').classList.add('on'); (v1?$('#gPwd'):$('#gUser')).focus();
-    return;
-  }
-  DADOS=Array.isArray(raw)?raw:[];
-  DKEY=null; DKRAW=null; DKDF=null; USUARIOS=[]; VER=0;
-  finaliza();
-}
-
-async function abreSessao(rawDK){
-  DKRAW=rawDK; DKEY=await importDK(rawDK);
-  DADOS=await decifra(PACK,DKEY);
-  sessionStorage.setItem('mapaGuinchos.sess',b64(rawDK));
-  finaliza();
-}
-
-function finaliza(){
+async function entrou(){
   pronto=true;
   $('#gate').classList.remove('on');
-  const b=$('#secBadge'); b.style.display='';
-  b.textContent = DKEY ? (USER?'👤 '+USER:'🔒 protegido') : '🌐 lista pública';
-  b.style.color = DKEY ? '#31d07a' : '#8d99a8';
-  $('#btnLock').style.display = DKEY ? '' : 'none';
-  loginUI(); render();
+  $('#quem').textContent = (EU.admin?'👑 ':'👤 ')+EU.usuario;
+  $('#quem').style.color = EU.admin ? '#ffb020' : '#8d99a8';
+  document.querySelector('.tabs button[data-t=add]').hidden = !EU.admin;
+  document.querySelector('.tabs button[data-t=cfg]').hidden = !EU.admin;
+  DADOS=await api('empresas');
+  if(EU.admin) carregaUsuarios();
+  render();
 }
 
 $('#gBtn').onclick=async()=>{
-  const u=$('#gUser').value.trim(), pwd=$('#gPwd').value, M=$('#gateMsg');
-  if(!pwd) return msg(M,'Digite a senha.','err');
-  if(VER===2 && !u) return msg(M,'Digite o usuário.','err');
-  msg(M,'Verificando…','');
+  const usuario=$('#gUser').value.trim(), senha=$('#gPwd').value, M=$('#gateMsg');
+  if(!usuario) return msg(M,'Digite o usuário.','err');
+  if(!senha) return msg(M,'Digite a senha.','err');
+  if(MODO==='setup' && senha!==$('#gPwd2').value) return msg(M,'As senhas não conferem.','err');
+  $('#gBtn').disabled=true; msg(M,'Verificando…','');
   try{
-    if(VER===1){
-      const key=await kdfKey(pwd,DKDF);
-      DADOS=await decifra(PACK,key);
-      DKEY=key; DKRAW=null; USER=null;
-      $('#gPwd').value=''; $('#gate').classList.remove('on'); pronto=true; finaliza();
-      return;
-    }
-    const rec=USUARIOS.find(x=>norm(x.u)===norm(u));
-    if(!rec){ await kdfKey(pwd,novoKdf()); throw new Error('nope'); }  // tempo parecido, sem revelar se o usuário existe
-    const raw=await desembrulha(rec,pwd);
-    USER=rec.u;
-    $('#gUser').value=''; $('#gPwd').value=''; msg(M,'','');
-    await abreSessao(raw);
-  }catch(e){ USER=null; msg(M,'Usuário ou senha incorretos.','err'); }
+    const r=await api(MODO==='setup'?'setup':'login',{method:'POST',body:{usuario,senha}});
+    EU=r.usuario; $('#gPwd').value=''; $('#gPwd2').value=''; msg(M,'','');
+    await entrou();
+  }catch(e){ msg(M,e.message,'err'); }
+  $('#gBtn').disabled=false;
 };
-['gUser','gPwd'].forEach(id=>$('#'+id).addEventListener('keydown',e=>{ if(e.key==='Enter') $('#gBtn').click(); }));
-$('#btnLock').onclick=()=>{ sessionStorage.removeItem('mapaGuinchos.sess'); DKEY=DKRAW=TOKEN=null; DADOS=[]; location.reload(); };
+['gUser','gPwd','gPwd2'].forEach(id=>$('#'+id).addEventListener('keydown',e=>{ if(e.key==='Enter') $('#gBtn').click(); }));
+$('#btnSair').onclick=async()=>{ await api('logout',{method:'POST'}); location.reload(); };
 
-/* ================= GitHub ================= */
-function api(method,body){
-  const path=cfg.path||'empresas.json';
-  const url=`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}`
-          + (method==='GET'?`?ref=${cfg.branch||'main'}&t=${Date.now()}`:'');
-  const h={'Accept':'application/vnd.github+json'};
-  if(TOKEN) h['Authorization']='Bearer '+TOKEN;
-  if(body) h['Content-Type']='application/json';
-  return fetch(url,{method,headers:h,body:body?JSON.stringify(body):undefined});
-}
-async function payload(){
-  if(!DKEY) return JSON.stringify(DADOS,null,1);
-  const p=await cifra(DADOS,DKEY);
-  if(VER===1) return JSON.stringify({cifrado:1,kdf:DKDF,iv:p.iv,ct:p.ct});
-  return JSON.stringify({cifrado:2,usuarios:USUARIOS,iv:p.iv,ct:p.ct});
-}
-async function persiste(msgEl,acao){
-  if(!DKEY) localStorage.setItem(LS_CACHE,JSON.stringify(DADOS));
-  if(!TOKEN||!cfg.owner||!cfg.repo){
-    msg(msgEl,'Salvo só neste navegador. Destrave o modo admin (aba Config) para publicar.','');
-    return false;
-  }
-  try{
-    const g=await api('GET'); if(g.ok) sha=(await g.json()).sha;
-    const texto=await payload();
-    const conteudo=b64(enc.encode(texto));
-    const r=await api('PUT',{message:acao,content:conteudo,sha:sha||undefined,branch:cfg.branch||'main'});
-    if(!r.ok){ const e=await r.json().catch(()=>({})); msg(msgEl,'Erro GitHub: '+(e.message||r.status),'err'); return false; }
-    sha=(await r.json()).content.sha;
-    msg(msgEl,'✓ Publicado no GitHub','ok');
-    setTimeout(()=>{ if(msgEl.textContent.startsWith('✓')) msgEl.textContent=''; },5000);
-    return true;
-  }catch(e){ msg(msgEl,'Falha de rede: '+e.message,'err'); return false; }
-}
-
-/* ================= mapa ================= */
+/* ---------- mapa ---------- */
 function desenhaMapa(){
   const s=$('#svgmap');
   s.setAttribute('viewBox',`0 0 ${VBW} ${MAPA.height}`);
@@ -454,7 +295,7 @@ function desenhaMapa(){
   zoomPan(s);
 }
 function desenhaPontos(){
-  const g=$('#gPt'); const grupos={};
+  const g=$('#gPt'), grupos={};
   DADOS.forEach(e=>{ const k=e.uf+'|'+e.cidade; (grupos[k]=grupos[k]||[]).push(e); });
   let h='';
   for(const k in grupos){
@@ -497,7 +338,7 @@ function zoomPan(svg){
   $('#zreset').onclick=()=>{vb=base.slice();set()};
 }
 
-/* ================= UI ================= */
+/* ---------- UI ---------- */
 function montaSelects(){
   const ufs=Object.keys(MAPA.nomes).sort();
   const opts=ufs.map(u=>`<option value="${u}">${u} – ${esc(MAPA.nomes[u])}</option>`).join('');
@@ -519,16 +360,17 @@ function render(){
     p.classList.toggle('has',DADOS.some(d=>d.uf===p.dataset.uf));
   });
   desenhaPontos();
-  const q=norm($('#q').value), t=$('#fTipo').value;
+  const qs=norm($('#q').value), t=$('#fTipo').value;
   const lst=DADOS.filter(e=>(!ufSel||e.uf===ufSel)&&(!t||e.tipo===t)&&
-    (!q||norm(e.nome+' '+e.cidade+' '+e.telefone+' '+e.uf).includes(q)))
+    (!qs||norm(e.nome+' '+e.cidade+' '+e.telefone+' '+e.uf).includes(qs)))
     .sort((a,b)=>a.uf.localeCompare(b.uf)||a.cidade.localeCompare(b.cidade)||a.nome.localeCompare(b.nome));
   $('#lista').innerHTML = lst.length ? lst.map(e=>`
     <div class="card" id="card-${e.id}" data-id="${e.id}" style="${destaque===e.id?'border-color:var(--acc)':''}">
       <div class="n"><i style="background:${CORES[e.tipo]}"></i>${esc(e.nome)}</div>
       <div class="m"><span>${esc(e.cidade)} – ${e.uf}</span><a href="tel:${esc(String(e.telefone).replace(/\D/g,''))}">${esc(e.telefone)}</a></div>
-      <div class="m"><span style="color:${CORES[e.tipo]}">${ROTULO[e.tipo]}</span><button class="danger rm" data-id="${e.id}" style="padding:2px 8px;font-size:11px">remover</button></div>
-    </div>`).join('') : `<div class="empty">Nenhuma empresa encontrada.<br>Use a aba <b>Adicionar</b>.</div>`;
+      <div class="m"><span style="color:${CORES[e.tipo]}">${ROTULO[e.tipo]}</span>
+        ${EU.admin?`<button class="danger rm" data-id="${e.id}" style="padding:2px 8px;font-size:11px">remover</button>`:''}</div>
+    </div>`).join('') : `<div class="empty">Nenhuma empresa encontrada.${EU.admin?'<br>Use a aba <b>Adicionar</b>.':''}</div>`;
   $('#lista').querySelectorAll('.card').forEach(c=>c.onclick=ev=>{
     if(ev.target.classList.contains('rm'))return; destaque=c.dataset.id; render();
   });
@@ -536,23 +378,25 @@ function render(){
     ev.stopPropagation();
     const e=DADOS.find(d=>d.id===b.dataset.id);
     if(!confirm(`Remover "${e.nome}" (${e.cidade}-${e.uf})?`))return;
-    DADOS=DADOS.filter(d=>d.id!==e.id); render();
-    await persiste($('#msg'),`remove: ${e.nome} (${e.cidade}-${e.uf})`);
+    try{ await api('empresas/'+e.id,{method:'DELETE'}); DADOS=DADOS.filter(d=>d.id!==e.id); render(); }
+    catch(err){ alert(err.message); }
   });
 }
 
 $('#btnSalvar').onclick=async()=>{
-  const uf=$('#aUf').value, cid=$('#aCidade').value.trim(), nome=$('#aNome').value.trim(),
-        tel=$('#aTel').value.trim(), tipo=$('#aTipo').value, M=$('#msg');
-  if(!uf) return msg(M,'Selecione o estado.','err');
-  if(!nome) return msg(M,'Informe o nome da empresa.','err');
-  if(!tel) return msg(M,'Informe o telefone.','err');
-  const c=(CIDADES.cidades[uf]||[]).find(x=>norm(x[0])===norm(cid));
-  if(!c) return msg(M,'Cidade não encontrada em '+uf+'. Escolha uma da lista.','err');
-  DADOS.push({id:uid(),nome,telefone:tel,tipo,uf,cidade:c[0],lat:c[1],lon:c[2],criadoEm:new Date().toISOString().slice(0,10)});
-  $('#aNome').value=''; $('#aTel').value='';
-  render();
-  await persiste(M,`add: ${nome} (${c[0]}-${uf})`);
+  const M=$('#msg');
+  const body={uf:$('#aUf').value,cidade:$('#aCidade').value.trim(),nome:$('#aNome').value.trim(),
+              telefone:$('#aTel').value.trim(),tipo:$('#aTipo').value};
+  if(!body.uf) return msg(M,'Selecione o estado.','err');
+  $('#btnSalvar').disabled=true;
+  try{
+    const nova=await api('empresas',{method:'POST',body});
+    DADOS.push(nova); $('#aNome').value=''; $('#aTel').value='';
+    msg(M,`✓ ${nova.nome} cadastrada em ${nova.cidade}-${nova.uf}.`,'ok');
+    setTimeout(()=>{ if(M.textContent.startsWith('✓')) M.textContent=''; },5000);
+    render();
+  }catch(e){ msg(M,e.message,'err'); }
+  $('#btnSalvar').disabled=false;
 };
 $('#btnLimpar').onclick=()=>['aCidade','aNome','aTel'].forEach(i=>$('#'+i).value='');
 
@@ -560,152 +404,43 @@ document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='p-'+b.dataset.t));
 });
-$('#btnAdmin').onclick=()=>document.querySelector('.tabs button[data-t=cfg]').click();
 
-/* ================= config ================= */
-function preencheCfg(){
-  const m=location.hostname.match(/^([^.]+)\.github\.io$/);
-  const rp=location.pathname.split('/').filter(Boolean)[0];
-  $('#cOwner').value=cfg.owner||(m?m[1]:'');
-  $('#cRepo').value=cfg.repo||(m&&rp?rp:'');
-  $('#cBranch').value=cfg.branch||'main';
-  $('#cPath').value=cfg.path||'empresas.json';
-  if(!localStorage.getItem(LS_TOK)) $('#cToken').placeholder='github_pat_…';
-}
-$('#btnRepoSave').onclick=async()=>{
-  cfg.owner=$('#cOwner').value.trim(); cfg.repo=$('#cRepo').value.trim();
-  cfg.branch=$('#cBranch').value.trim()||'main'; cfg.path=$('#cPath').value.trim()||'empresas.json';
-  salvaCfg(); msg($('#admMsg'),'Repositório salvo. Recarregando…','ok');
-  setTimeout(()=>location.reload(),700);
-};
-
-function admUI(open){
-  $('#admLocked').style.display=open?'none':'';
-  $('#admOpen').style.display=open?'':'none';
-}
-$('#btnAdmUnlock').onclick=async()=>{
-  const pwd=$('#cAdmPwd').value, tok=$('#cToken').value.trim(), M=$('#admMsg');
-  if(pwd.length<8) return msg(M,'A senha de admin precisa de pelo menos 8 caracteres.','err');
-  const salvo=localStorage.getItem(LS_TOK);
-  try{
-    if(tok){
-      const kdf=novoKdf(); const key=await kdfKey(pwd,kdf); const p=await cifra(tok,key);
-      localStorage.setItem(LS_TOK,JSON.stringify({kdf,iv:p.iv,ct:p.ct}));
-      TOKEN=tok;
-    }else if(salvo){
-      const o=JSON.parse(salvo); const key=await kdfKey(pwd,o.kdf);
-      TOKEN=await decifra(o,key);
-    }else{
-      return msg(M,'Nenhum token salvo. Cole o token do GitHub.','err');
-    }
-  }catch(e){ return msg(M,'Senha de admin incorreta.','err'); }
-  $('#cAdmPwd').value=''; $('#cToken').value='';
-  const r=await api('GET');
-  if(!r.ok){ TOKEN=null; return msg(M,'Token recusado pelo GitHub ('+r.status+'). Confira o repositório e as permissões.','err'); }
-  sha=(await r.json()).sha;
-  admUI(true); msg(M,'','');
-};
-$('#btnAdmLock').onclick=()=>{ TOKEN=null; admUI(false); msg($('#admMsg'),'Admin travado.',''); };
-$('#btnAdmForget').onclick=()=>{
-  if(!confirm('Apagar o token salvo neste navegador?'))return;
-  localStorage.removeItem(LS_TOK); TOKEN=null; admUI(false);
-  msg($('#admMsg'),'Token apagado deste navegador.','');
-};
-
-function loginUI(){
-  const on = VER===2 && !!DKEY;
-  $('#loginOff').style.display = (VER===0||!DKEY)?'':'none';
-  $('#loginOn').style.display = on?'':'none';
-  if(!on) return;
-  $('#listaUsers').innerHTML = USUARIOS.map(u=>`
+/* ---------- usuários ---------- */
+async function carregaUsuarios(){
+  const us=await api('usuarios');
+  $('#listaUsers').innerHTML=us.map(u=>`
     <div class="card" style="cursor:default">
-      <div class="n">👤 ${esc(u.u)}${norm(u.u)===norm(USER||'')?' <span class="badge">você</span>':''}</div>
-      <div class="m">
-        <button class="pw" data-u="${esc(u.u)}" style="padding:2px 8px;font-size:11px">trocar senha</button>
-        <button class="danger del" data-u="${esc(u.u)}" style="padding:2px 8px;font-size:11px">remover</button>
-      </div>
+      <div class="n">${u.admin?'👑':'👤'} ${esc(u.usuario)}${u.id===EU.id?' <span class="badge">você</span>':''}</div>
+      <div class="m"><span>${u.admin?'administrador':'só visualiza'}</span>
+        <span>
+          <button class="pw" data-id="${u.id}" data-u="${esc(u.usuario)}" style="padding:2px 8px;font-size:11px">senha</button>
+          ${u.id!==EU.id?`<button class="danger del" data-id="${u.id}" data-u="${esc(u.usuario)}" style="padding:2px 8px;font-size:11px;margin-left:4px">remover</button>`:''}
+        </span></div>
     </div>`).join('');
-  $('#listaUsers').querySelectorAll('.del').forEach(b=>b.onclick=()=>removeUser(b.dataset.u));
-  $('#listaUsers').querySelectorAll('.pw').forEach(b=>b.onclick=()=>trocaSenha(b.dataset.u));
+  $('#listaUsers').querySelectorAll('.del').forEach(b=>b.onclick=()=>removeUser(b.dataset.id,b.dataset.u));
+  $('#listaUsers').querySelectorAll('.pw').forEach(b=>b.onclick=()=>trocaSenha(b.dataset.id,b.dataset.u));
 }
-
-function exigeAdmin(M){
-  if(!TOKEN){ msg(M,'Destrave o modo admin antes (bloco 2).','err'); return false; }
-  return true;
-}
-
-$('#btnLoginOn').onclick=async()=>{
-  const u=$('#cU1').value.trim(), p1=$('#cP1').value, p2=$('#cP2').value, M=$('#accMsg');
-  if(!u) return msg(M,'Informe o nome do primeiro usuário.','err');
-  if(p1.length<8) return msg(M,'A senha precisa de pelo menos 8 caracteres.','err');
-  if(p1!==p2) return msg(M,'As senhas não conferem.','err');
-  if(!exigeAdmin(M)) return;
-  msg(M,'Criptografando…','');
-  DKRAW=crypto.getRandomValues(new Uint8Array(32));
-  DKEY=await importDK(DKRAW); VER=2;
-  USUARIOS=[await embrulha(u,p1,DKRAW)]; USER=u;
-  const ok=await persiste(M,`seguranca: ativa login (usuario ${u})`);
-  if(ok){
-    localStorage.removeItem(LS_CACHE);
-    sessionStorage.setItem('mapaGuinchos.sess',b64(DKRAW));
-    ['cU1','cP1','cP2'].forEach(i=>$('#'+i).value='');
-    msg(M,'✓ Login ativado. Guarde a senha — sem ela os dados não voltam.','ok');
-    finaliza();
-  }else{ DKEY=DKRAW=null; VER=0; USUARIOS=[]; USER=null; loginUI(); }
-};
-
 $('#btnUserAdd').onclick=async()=>{
-  const u=$('#cUN').value.trim(), p=$('#cUP').value, M=$('#accMsg');
-  if(!u) return msg(M,'Informe o usuário.','err');
-  if(p.length<8) return msg(M,'A senha precisa de pelo menos 8 caracteres.','err');
-  if(USUARIOS.some(x=>norm(x.u)===norm(u))) return msg(M,'Já existe um usuário com esse nome.','err');
-  if(!exigeAdmin(M)) return;
-  if(!DKRAW) return msg(M,'Entre com um usuário e senha para poder gerenciar contas.','err');
-  msg(M,'Criando…','');
-  USUARIOS.push(await embrulha(u,p,DKRAW));
-  if(await persiste(M,`usuarios: adiciona ${u}`)){
-    $('#cUN').value=''; $('#cUP').value='';
-    msg(M,`✓ Usuário "${u}" criado.`,'ok'); loginUI();
-  }else{ USUARIOS.pop(); loginUI(); }
-};
-
-async function removeUser(u){
   const M=$('#accMsg');
-  if(!exigeAdmin(M)) return;
-  if(USUARIOS.length<=1) return msg(M,'Não dá para remover o último usuário. Use "Desativar login".','err');
-  if(!confirm(`Remover o usuário "${u}"? Ele perde o acesso imediatamente.`))return;
-  const bak=USUARIOS.slice();
-  USUARIOS=USUARIOS.filter(x=>norm(x.u)!==norm(u));
-  if(await persiste(M,`usuarios: remove ${u}`)){ msg(M,`✓ Usuário "${u}" removido.`,'ok'); loginUI(); }
-  else { USUARIOS=bak; loginUI(); }
+  try{
+    await api('usuarios',{method:'POST',body:{usuario:$('#cUN').value.trim(),senha:$('#cUP').value,admin:$('#cUA').checked}});
+    $('#cUN').value=''; $('#cUP').value=''; $('#cUA').checked=false;
+    msg(M,'✓ Usuário criado.','ok'); carregaUsuarios();
+  }catch(e){ msg(M,e.message,'err'); }
+};
+async function removeUser(id,u){
+  if(!confirm(`Remover "${u}"? A sessão dele cai na hora.`))return;
+  try{ await api('usuarios/'+id,{method:'DELETE'}); msg($('#accMsg'),`✓ "${u}" removido.`,'ok'); carregaUsuarios(); }
+  catch(e){ msg($('#accMsg'),e.message,'err'); }
+}
+async function trocaSenha(id,u){
+  const senha=prompt(`Nova senha para "${u}" (mínimo 8 caracteres):`);
+  if(senha===null)return;
+  try{ await api(`usuarios/${id}/senha`,{method:'POST',body:{senha}}); msg($('#accMsg'),`✓ Senha de "${u}" alterada.`,'ok'); }
+  catch(e){ msg($('#accMsg'),e.message,'err'); }
 }
 
-async function trocaSenha(u){
-  const M=$('#accMsg');
-  if(!exigeAdmin(M)) return;
-  if(!DKRAW) return msg(M,'Entre com um usuário e senha para poder gerenciar contas.','err');
-  const p=prompt(`Nova senha para "${u}" (mínimo 8 caracteres):`);
-  if(p===null) return;
-  if(p.length<8) return msg(M,'A senha precisa de pelo menos 8 caracteres.','err');
-  const bak=USUARIOS.slice();
-  const i=USUARIOS.findIndex(x=>norm(x.u)===norm(u));
-  USUARIOS[i]=await embrulha(USUARIOS[i].u,p,DKRAW);
-  if(await persiste(M,`usuarios: troca senha de ${u}`)) msg(M,`✓ Senha de "${u}" alterada.`,'ok');
-  else USUARIOS=bak;
-}
-
-$('#btnLoginOff').onclick=async()=>{
-  const M=$('#accMsg');
-  if(!exigeAdmin(M)) return;
-  if(!confirm('Desativar o login? A lista fica visível para qualquer pessoa com o link.'))return;
-  const bak={k:DKEY,r:DKRAW,u:USUARIOS,v:VER};
-  DKEY=null; DKRAW=null; USUARIOS=[]; VER=0; USER=null;
-  if(await persiste(M,'seguranca: desativa login')){
-    sessionStorage.removeItem('mapaGuinchos.sess');
-    msg(M,'Login desativado.',''); finaliza();
-  }else{ DKEY=bak.k; DKRAW=bak.r; USUARIOS=bak.u; VER=bak.v; loginUI(); }
-};
-
+/* ---------- backup ---------- */
 $('#btnExport').onclick=()=>{
   const b=new Blob([JSON.stringify(DADOS,null,1)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(b);
@@ -713,15 +448,19 @@ $('#btnExport').onclick=()=>{
 };
 $('#fImport').onchange=async e=>{
   const f=e.target.files[0]; if(!f)return; const M=$('#impMsg');
+  if(!confirm('Importar substitui toda a lista atual. Continuar?')){ e.target.value=''; return; }
   try{
     const arr=JSON.parse(await f.text());
-    if(!Array.isArray(arr)) throw new Error('o arquivo precisa ser uma lista');
-    arr.forEach(x=>{ if(!x.id)x.id=uid(); });
-    DADOS=arr; render(); await persiste(M,'import: '+f.name);
+    const r=await api('empresas/import',{method:'POST',body:arr});
+    DADOS=await api('empresas'); render();
+    msg(M,`✓ ${r.importadas} importadas${r.ignoradas?`, ${r.ignoradas} ignoradas`:''}.`,'ok');
   }catch(err){ msg(M,'Erro ao importar: '+err.message,'err'); }
+  e.target.value='';
 };
 
-boot();
+boot().catch(e=>{
+  document.body.innerHTML=`<div style="padding:40px;text-align:center;color:#ff8080">Falha ao carregar: ${esc(e.message)}</div>`;
+});
 </script>
 </body>
 </html>

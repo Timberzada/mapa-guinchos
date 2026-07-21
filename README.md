@@ -1,120 +1,91 @@
 # Mapa de Guinchos & Para-brisas
 
-Mapa interativo do Brasil (27 UFs) para cadastrar empresas de guincho e para-brisa por estado/cidade.
-100% estático — roda no GitHub Pages, sem servidor.
+Mapa interativo do Brasil (27 UFs) para cadastrar empresas de guincho e para-brisa por estado e cidade.
+Aplicação Node com login, pensada para rodar no Railway.
 
 ## Estrutura
 
 ```
-index.html      app completo (HTML + CSS + JS, sem dependências)
+server.js       API + servidor HTTP
+db.js           persistência (JSON com escrita atômica)
+auth.js         sessão por cookie assinado
+index.html      front completo (HTML + CSS + JS, sem dependências)
 mapa.json       paths SVG dos 27 estados + parâmetros da projeção
 cidades.json    5.590 municípios com lat/lon
-empresas.json   ← o "banco de dados" (editado pelo próprio site)
-README.md
 ```
 
-## Publicar no GitHub Pages
+Os dados ficam em `DB_PATH` (padrão `./data/dados.json`) — fora do repositório.
 
-1. Crie um repositório (ex.: `mapa-guinchos`) e suba estes arquivos na raiz.
-2. Settings → Pages → Source: **Deploy from a branch** → `main` / `/ (root)` → Save.
-3. Acesse `https://SEU-USUARIO.github.io/mapa-guinchos/`.
+## Deploy no Railway
 
-## Segurança e login
+1. **New Project → Deploy from GitHub repo** → selecione este repositório.
+2. **Variables** — defina:
+   - `SESSION_SECRET` — string aleatória longa. Sem ela, todo deploy derruba as sessões.
+   - `NODE_ENV=production` — liga o cookie `Secure`.
+   - `DB_PATH=/data/dados.json`
+   - *(opcional)* `ADMIN_USUARIO` e `ADMIN_SENHA` criam o admin inicial sem passar pela tela de setup.
+3. **Settings → Volumes → New Volume**, mount path `/data`.
+   Sem isso os dados somem a cada deploy.
+4. **Settings → Networking → Generate Domain**.
 
-Duas camadas independentes:
+O Railway detecta Node automaticamente e roda `npm start`. Não há etapa de build nem módulo nativo, então o deploy leva poucos segundos.
 
-| | Quem tem | Permite |
+### Primeiro acesso
+
+Abra a URL: se ainda não existe nenhum usuário, a tela pede para **criar o administrador**. Feito isso, o cadastro fecha — a rota `/api/setup` passa a responder 409 e novos usuários só saem pelo painel.
+
+## Como funciona a segurança
+
+| | Como |
+|---|---|
+| Senhas | bcrypt, custo 12. O hash nunca sai do servidor. |
+| Sessão | Cookie `HttpOnly`, `SameSite=Lax`, `Secure` em produção, assinado com HMAC-SHA256. |
+| Revogação | O cookie carrega o `token_version` do usuário. Trocar a senha ou remover a conta invalida as sessões abertas **na hora**. |
+| Força bruta | Rate limit de 20 tentativas de login por 15 min por IP. |
+| Enumeração de usuários | Login sempre roda o bcrypt, mesmo sem usuário, e devolve a mesma mensagem nos dois casos. |
+| Coordenadas | O cliente manda só UF e cidade; lat/lon vêm da base do servidor. Não dá para forjar posição. |
+| Estáticos | Whitelist explícita — só `index.html`, `mapa.json` e `cidades.json`. `server.js`, `package.json` e o arquivo de dados não são serváveis. |
+
+## Permissões
+
+- **Administrador** — cadastra e remove empresas, gerencia usuários, importa backup.
+- **Usuário comum** — só visualiza o mapa e a lista.
+
+Um administrador não consegue remover a própria conta nem o último admin do sistema.
+
+## API
+
+| Método | Rota | Acesso |
 |---|---|---|
-| **Login** (usuário + senha) | Cada pessoa da equipe, com senha própria | Ver o mapa e a lista |
-| **Senha de admin + token** | Só você | Cadastrar, remover e gerenciar usuários |
+| GET | `/api/status` | público |
+| POST | `/api/setup` | só enquanto não há usuários |
+| POST | `/api/login` · `/api/logout` | público |
+| GET | `/api/empresas` | logado |
+| POST · DELETE | `/api/empresas` · `/api/empresas/:id` | admin |
+| POST | `/api/empresas/import` | admin |
+| GET · POST · DELETE | `/api/usuarios` … | admin |
+| POST | `/api/usuarios/:id/senha` | admin |
 
-Sem login, o site fica aberto para qualquer um com o link.
+## Rodar local
 
-### Como funciona por baixo
-
-Envelope encryption. A lista é cifrada com uma **chave aleatória de 256 bits**; essa chave é guardada cifrada **uma vez para cada usuário**, com a senha dele. Entrar = descobrir a chave a partir da sua senha e então abrir a lista.
-
-O ganho prático: remover uma pessoa é apagar o envelope dela — ninguém mais precisa trocar de senha.
-
-```json
-{
-  "cifrado": 2,
-  "usuarios": [
-    {"u":"felipe","kdf":{"salt":"…","iter":310000},"iv":"…","ct":"…"},
-    {"u":"joao",  "kdf":{"salt":"…","iter":310000},"iv":"…","ct":"…"}
-  ],
-  "iv": "…", "ct": "…"
-}
+```bash
+npm install
+SESSION_SECRET=qualquercoisa npm start
+# http://localhost:3000
 ```
 
-`ct` de cada usuário é a chave dos dados cifrada com a senha daquele usuário. O `ct` de fora é a lista de empresas.
+## Recursos do mapa
 
-Cripto: PBKDF2-SHA256 (310.000 iterações) + AES-GCM 256, tudo com Web Crypto nativa. Sem biblioteca externa.
-
-> ⚠️ **A proteção vale o que valer a senha mais fraca.** O arquivo cifrado é público — dá para baixar e tentar quebrar offline. Exija senhas longas.
-> ⚠️ **Perdeu todas as senhas, perdeu os dados.** Não há recuperação. Exporte o JSON de vez em quando.
-> ℹ️ A sessão fica aberta enquanto a aba existir (`sessionStorage`). Fechou a aba, pede login de novo.
-
-## Configurar (aba Config)
-
-**1 · Repositório** — usuário, repo, branch e arquivo. Salvar recarrega a página.
-
-**2 · Admin (token)**
-
-1. GitHub → **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**
-2. Repository access: **Only select repositories** → o repo do mapa
-3. Permissions → Repository permissions → **Contents: Read and write**
-4. No site: crie uma **senha de admin** (8+), cole o token, **Destravar admin**
-
-Depois disso, só a senha destrava — o token fica cifrado no navegador. **Esquecer** o apaga dali.
-
-**3 · Login e usuários** — com o admin destravado, crie o primeiro usuário e clique **Ativar login**. Depois o bloco vira a lista de contas, onde dá para **adicionar**, **trocar senha** e **remover**. Não é possível remover o último usuário (use **Desativar login**).
-
-**4 · Backup** — importar um `.json` exportado antes.
-
-Toda alteração vira um commit automático no `empresas.json`. O GitHub Pages republica em ~30–60s.
-
-## Formato de `empresas.json`
-
-```json
-[
-  {
-    "id": "m8x2k1abc",
-    "nome": "Guincho Rápido 24h",
-    "telefone": "(11) 91234-5678",
-    "tipo": "guincho",
-    "uf": "SP",
-    "cidade": "Campinas",
-    "lat": -22.9056,
-    "lon": -47.0608,
-    "criadoEm": "2026-07-20"
-  }
-]
-```
-
-`tipo`: `guincho` | `parabrisa` | `ambos`
-
-## Recursos
-
-- Clique em um estado → filtra a lista; clique de novo → limpa
+- Clique num estado filtra a lista; clique de novo limpa
 - Zoom com scroll, arrastar para mover, botões `+ − ⟲`
-- Botão **🔒 Bloquear** encerra a sessão e volta para a tela de login
-- Busca por nome, cidade ou telefone; filtro por UF e por tipo
-- Pontos de empresas na mesma cidade se espalham em círculo (não sobrepõem)
+- Busca por nome, cidade ou telefone; filtros por UF e tipo
+- Empresas na mesma cidade se espalham em círculo, sem sobrepor
 - Telefone vira link `tel:` no celular
-- **Exportar JSON** (backup) e importar backup na aba Config
+- Exportar/importar JSON para backup
 
 ## Notas técnicas
 
-- Projeção **Mercator**; `mapa.json → proj` guarda `minx/maxy/k/pad`, e o JS usa exatamente a mesma fórmula para posicionar os pontos — mapa e pontos ficam sempre alinhados.
+- Projeção **Mercator**. `mapa.json → proj` guarda `minx/maxy/k/pad` e o front usa a mesma fórmula para posicionar os pontos, então mapa e pontos nunca saem de alinhamento.
 - Contornos dos estados derivados do **Natural Earth** (domínio público).
-- Municípios: lista oficial IBGE; coordenadas do **GeoNames** (CC BY 4.0). ~96% com coordenada exata; o restante foi ajustado para dentro do polígono do estado.
-- Sem dependências, sem CDN, sem build. Abrir `index.html` direto do disco não funciona por causa do `fetch` — use `python3 -m http.server` para testar local.
-
-## Testar localmente
-
-```bash
-cd mapa-guinchos
-python3 -m http.server 8080
-# abra http://localhost:8080
-```
+- Municípios: lista oficial do IBGE; coordenadas do **GeoNames** (CC BY 4.0). Cerca de 96% com coordenada exata; o restante foi ajustado para cair dentro do polígono do estado.
+- Persistência em JSON é decisão consciente de escala: sem dependência nativa, sem etapa de build, e o volume do Railway já dá durabilidade. Se um dia a lista passar de dezenas de milhares, `db.js` é o único arquivo a trocar.
