@@ -408,7 +408,7 @@ function desenhaPontos(){
    4) colisão retangular: um nome só entra se a caixa dele não toca nenhuma
       já colocada. Assim capital e cidades grandes ganham o rótulo, e o resto
       só aparece quando há espaço — nunca dois nomes sobrepostos. */
-const LIMIAR_CID = 0.40, MAX_CID = 50;
+const LIMIAR_CID = 0.40, MAX_CID = 180;
 function desenhaCidades(){
   const g=$('#gCid'); if(!g) return;
   if(!pronto || ESCALA > LIMIAR_CID){ if(g.firstChild) g.textContent=''; return; }
@@ -427,11 +427,11 @@ function desenhaCidades(){
   vis.sort((a,b)=>b[0]-a[0]);                           // maior população primeiro
 
   // grade de ocupação para a colisão; célula com folga para os nomes respirarem
-  const cel=fs*2.6, ocup=new Set(), gc=v=>Math.floor(v/cel);
+  const cel=fs*2.0, ocup=new Set(), gc=v=>Math.floor(v/cel);
   let out='', n=0;
   for(const [,px,py,nome] of vis){
     if(n>=MAX_CID) break;
-    const halfW=nome.length*fs*0.34 + fs*1.8;          // meia-largura do rótulo, com espaço extra
+    const halfW=nome.length*fs*0.30 + fs*1.0;          // meia-largura do rótulo
     const bx0=gc(px-halfW), bx1=gc(px+halfW), by0=gc(py-fs*0.3), by1=gc(py+fs*1.6);
     let toca=false;
     for(let gx=bx0; gx<=bx1 && !toca; gx++) for(let gy=by0; gy<=by1; gy++){ if(ocup.has(gx+':'+gy)){ toca=true; break; } }
