@@ -396,8 +396,10 @@ function zoomPan(svg){
     const nova=vb[2]/base[2];
     if(nova!==ESCALA){                       // só reagrupa quando o zoom muda, não ao arrastar
       ESCALA=nova;
-      cancelAnimationFrame(pendente);
-      pendente=requestAnimationFrame(()=>{ if(pronto) desenhaPontos(); });
+      // setTimeout e não requestAnimationFrame: o navegador congela o rAF em aba
+      // de segundo plano, e o mapa ficaria com o agrupamento velho ao voltar.
+      clearTimeout(pendente);
+      pendente=setTimeout(()=>{ if(pronto) desenhaPontos(); },16);
     }
   };
   const zoom=(f,cx,cy)=>{
