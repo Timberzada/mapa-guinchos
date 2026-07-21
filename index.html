@@ -231,17 +231,20 @@ function iniciaMapa(){
     preserveDrawingBuffer:true
   });
   map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');
-  // 'load' às vezes não dispara neste ambiente; 'idle' dispara sempre que o mapa
-  // termina de renderizar, então montamos as camadas por ali (com trava de uma vez só).
+  // Vários gatilhos + tentativas repetidas, porque em alguns navegadores o
+  // evento 'load'/'idle' e o isStyleLoaded() demoram ou não sinalizam direito.
   map.on('load', montaCamadas);
   map.on('idle', montaCamadas);
+  map.on('styledata', montaCamadas);
+  let tentativas=0;
+  const timer=setInterval(()=>{ if(camadasFeitas || ++tentativas>40){ clearInterval(timer); return; } montaCamadas(); }, 300);
 }
 function montaCamadas(){
-  if(camadasFeitas || !map.isStyleLoaded()) return;
+  if(camadasFeitas) return;
+  try{ map.addSource('empresas',{type:'geojson',data:geojson(ultimaLista),
+    cluster:true, clusterRadius:44, clusterMaxZoom:12}); }
+  catch(e){ return; }   // estilo ainda não pronto; o próximo gatilho tenta de novo
   camadasFeitas=true;
-
-  map.addSource('empresas',{type:'geojson',data:geojson(ultimaLista),
-    cluster:true, clusterRadius:44, clusterMaxZoom:12});
 
   map.addLayer({id:'clusters',type:'circle',source:'empresas',filter:['has','point_count'],
     paint:{
