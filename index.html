@@ -344,7 +344,7 @@ function ajustaEstiloBase(){
       map.moveLayer('place_state');   // topo da pilha = prioridade máxima na colisão
     }catch(e){}
   }
-  window.__ajusteEstados = 'v5-brasil-only+todos-estados';   // marcador p/ verificar o deploy
+  window.__ajusteEstados = 'v6-espalha-mesmo-local';   // marcador p/ verificar o deploy
 }
 function montaCamadas(){
   if(camadasFeitas) return;
@@ -393,11 +393,36 @@ function montaCamadas(){
   // um resize + micro-ajuste de zoom força a primeira renderização.
   setTimeout(()=>{ map.resize(); map.jumpTo({center:map.getCenter(),zoom:map.getZoom()+0.001}); },250);
 }
+// id -> [lon,lat] já com o espalhamento aplicado (usado ao clicar na lista)
+let POS={};
 function geojson(lst){
-  return {type:'FeatureCollection',features:lst.map(e=>({
-    type:'Feature',geometry:{type:'Point',coordinates:[e.lon,e.lat]},
-    properties:{id:e.id,nome:e.nome,cidade:e.cidade,uf:e.uf,telefone:e.telefone,tipo:e.tipo}
-  }))};
+  POS={};
+  // agrupa empresas na MESMA coordenada (mesma cidade) para espalhá-las
+  const grupos=new Map();
+  for(const e of lst){
+    const k=e.lat.toFixed(4)+','+e.lon.toFixed(4);
+    if(!grupos.has(k)) grupos.set(k,[]);
+    grupos.get(k).push(e);
+  }
+  const feats=[];
+  for(const g of grupos.values()){
+    g.forEach((e,i)=>{
+      let lon=e.lon, lat=e.lat;
+      if(g.length>1){            // várias no mesmo lugar: abre em anel para não sobrepor
+        const porAnel=8, anel=Math.floor(i/porAnel), idx=i%porAnel;
+        const nEsse=Math.min(porAnel, g.length-anel*porAnel);
+        const raio=0.02*(anel+1);                       // ~2 km por anel
+        const ang=(idx/nEsse)*2*Math.PI + anel*0.4;
+        const cosLat=Math.cos(lat*Math.PI/180)||1;
+        lon=e.lon + raio*Math.cos(ang)/cosLat;          // corrige a longitude pela latitude
+        lat=e.lat + raio*Math.sin(ang);
+      }
+      POS[e.id]=[lon,lat];
+      feats.push({type:'Feature',geometry:{type:'Point',coordinates:[lon,lat]},
+        properties:{id:e.id,nome:e.nome,cidade:e.cidade,uf:e.uf,telefone:e.telefone,tipo:e.tipo}});
+    });
+  }
+  return {type:'FeatureCollection',features:feats};
 }
 function atualizaMapa(lst){
   ultimaLista=lst;
@@ -416,8 +441,9 @@ function abrePopup(f){
 }
 function voaPara(e){
   if(!mapaPronto) return;
-  map.flyTo({center:[e.lon,e.lat],zoom:12,duration:800});
-  abrePopup({geometry:{type:'Point',coordinates:[e.lon,e.lat]},properties:e});
+  const c=POS[e.id]||[e.lon,e.lat];   // vai direto no ponto espalhado desta empresa
+  map.flyTo({center:c,zoom:13,duration:800});   // zoom 13 já separa as do mesmo lugar
+  abrePopup({geometry:{type:'Point',coordinates:c},properties:e});
 }
 
 /* ---------- boot ---------- */
