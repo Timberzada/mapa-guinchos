@@ -99,7 +99,7 @@ label.ck input{width:auto}
   <span class="badge" id="cnt">0 empresas</span>
   <span class="badge" id="quem"></span>
   <span class="sp"></span>
-  <button id="btnExport">Exportar JSON</button>
+  <button id="btnExport" hidden>Exportar JSON</button>
   <button id="btnSair">Sair</button>
 </header>
 
@@ -344,7 +344,7 @@ function ajustaEstiloBase(){
       map.moveLayer('place_state');   // topo da pilha = prioridade máxima na colisão
     }catch(e){}
   }
-  window.__ajusteEstados = 'v7-poly-buffer-litoral';   // marcador p/ verificar o deploy
+  window.__ajusteEstados = 'v8-export-so-admin';   // marcador p/ verificar o deploy
 }
 function montaCamadas(){
   if(camadasFeitas) return;
@@ -466,6 +466,7 @@ async function entrou(){
   $('#quem').style.color=EU.admin?'#ffb020':'#8d99a8';
   document.querySelector('.tabs button[data-t=add]').hidden=!EU.admin;
   document.querySelector('.tabs button[data-t=cfg]').hidden=!EU.admin;
+  $('#btnExport').hidden=!EU.admin;   // backup só para administradores
   DADOS=await api('empresas');
   if(EU.admin) carregaUsuarios();
   render();
@@ -591,6 +592,7 @@ async function trocaSenha(id,u){
 
 /* ---------- backup ---------- */
 $('#btnExport').onclick=()=>{
+  if(!EU||!EU.admin) return;   // trava: só administrador exporta o backup
   const b=new Blob([JSON.stringify(DADOS,null,1)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='empresas-backup.json'; a.click();
 };
