@@ -40,12 +40,12 @@ export const usuarios = {
   porNome:    nome => dados.usuarios.find(u => semAcento(u.usuario) === semAcento(nome)) || null,
   porId:      id => dados.usuarios.find(u => u.id === id) || null,
   lista:      () => dados.usuarios
-                      .map(({ id, usuario, admin, criado_em }) => ({ id, usuario, admin, criado_em }))
+                      .map(({ id, usuario, admin, operador, criado_em }) => ({ id, usuario, admin, operador: operador ? 1 : 0, criado_em }))
                       .sort((a, b) => a.usuario.localeCompare(b.usuario)),
-  cria(usuario, senha_hash, admin) {
+  cria(usuario, senha_hash, admin, operador) {
     const u = {
       id: dados.proximoId++, usuario, senha_hash,
-      admin: admin ? 1 : 0, token_version: 1,
+      admin: admin ? 1 : 0, operador: (operador && !admin) ? 1 : 0, token_version: 1,
       criado_em: new Date().toISOString()
     };
     dados.usuarios.push(u); salva();

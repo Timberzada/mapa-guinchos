@@ -64,3 +64,8 @@ export const exigeLogin = (req, res, next) =>
 
 export const exigeAdmin = (req, res, next) =>
   req.user?.admin ? next() : res.status(403).json({ erro: 'Ação restrita a administradores.' });
+
+// Administrador OU operador — quem pode gerenciar empresas (cadastrar/remover).
+export const exigeOperador = (req, res, next) =>
+  (req.user?.admin || req.user?.operador) ? next()
+    : res.status(403).json({ erro: 'Ação restrita a operadores e administradores.' });

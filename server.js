@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { usuarios, empresas, salva } from './db.js';
-import { criaToken, defineCookie, limpaCookie, sessao, exigeLogin, exigeAdmin } from './auth.js';
+import { criaToken, defineCookie, limpaCookie, sessao, exigeLogin, exigeAdmin, exigeOperador } from './auth.js';
 import { registra as audita, ultimos as auditoria } from './audit.js';
 
 const raiz = path.dirname(fileURLToPath(import.meta.url));
@@ -18,11 +18,22 @@ app.use(express.json({ limit: '2mb' }));
 /* ---------- base de municípios: valida cidade/coordenada no servidor ---------- */
 const CIDADES = JSON.parse(fs.readFileSync(path.join(PUB, 'cidades.json'), 'utf8')).cidades;
 const semAcento = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-const indice = {};
+// chave "solta": sem acento, h\u00edfen, espa\u00e7o ou pontua\u00e7\u00e3o \u2014 s\u00f3 letras/n\u00fameros.
+// Faz "jiparana" casar com "Ji-Paran\u00e1", "santaritadooeste" etc.
+const chaveSolta = s => semAcento(s).replace(/[^a-z0-9]/g, '');
+const indice = {};       // grafia exata (sem acento)
+const indiceSolto = {};  // grafia solta; entradas amb\u00edguas viram null p/ n\u00e3o errar
 for (const uf in CIDADES) {
   indice[uf] = new Map(CIDADES[uf].map(c => [semAcento(c[0]), c]));
+  const m = new Map();
+  for (const c of CIDADES[uf]) {
+    const k = chaveSolta(c[0]);
+    m.set(k, m.has(k) ? null : c);   // colis\u00e3o -> null (n\u00e3o adivinha)
+  }
+  indiceSolto[uf] = m;
 }
-const achaCidade = (uf, nome) => indice[uf]?.get(semAcento(nome)) || null;
+const achaCidade = (uf, nome) =>
+  indice[uf]?.get(semAcento(nome)) || indiceSolto[uf]?.get(chaveSolta(nome)) || null;
 
 /* ---------- cookies (parser mínimo, sem dependência) ---------- */
 app.use((req, _res, next) => {
@@ -43,7 +54,7 @@ const limite = (max, min) => rateLimit({
 });
 
 const txt = (v, max = 120) => typeof v === 'string' ? v.trim().slice(0, max) : '';
-const publico = u => ({ id: u.id, usuario: u.usuario, admin: !!u.admin });
+const publico = u => ({ id: u.id, usuario: u.usuario, admin: !!u.admin, operador: !!u.operador });
 
 /* ================= sessão ================= */
 
@@ -99,7 +110,7 @@ app.get('/api/audit', exigeLogin, exigeAdmin, (req, res) => {
   res.json(auditoria(n));
 });
 
-app.post('/api/empresas', exigeLogin, exigeAdmin, (req, res) => {
+app.post('/api/empresas', exigeLogin, exigeOperador, (req, res) => {
   const nome = txt(req.body?.nome, 120);
   const telefone = txt(req.body?.telefone, 40);
   const tipo = txt(req.body?.tipo, 20);
@@ -120,7 +131,7 @@ app.post('/api/empresas', exigeLogin, exigeAdmin, (req, res) => {
   res.status(201).json(linha);
 });
 
-app.delete('/api/empresas/:id', exigeLogin, exigeAdmin, (req, res) => {
+app.delete('/api/empresas/:id', exigeLogin, exigeOperador, (req, res) => {
   if (!empresas.remove(req.params.id)) return res.status(404).json({ erro: 'Empresa não encontrada.' });
   res.json({ ok: true });
 });
@@ -152,11 +163,14 @@ app.get('/api/usuarios', exigeLogin, exigeAdmin, (_req, res) => res.json(usuario
 app.post('/api/usuarios', exigeLogin, exigeAdmin, async (req, res) => {
   const usuario = txt(req.body?.usuario, 40);
   const senha = String(req.body?.senha || '');
-  const admin = req.body?.admin ? 1 : 0;
+  // papel: 'admin' | 'operador' | 'usuario' (aceita o antigo campo admin por compat.)
+  const papel = txt(req.body?.papel, 12) || (req.body?.admin ? 'admin' : 'usuario');
+  const admin = papel === 'admin' ? 1 : 0;
+  const operador = papel === 'operador' ? 1 : 0;
   if (usuario.length < 3) return res.status(400).json({ erro: 'Usuário precisa de ao menos 3 caracteres.' });
   if (senha.length < 8) return res.status(400).json({ erro: 'Senha precisa de ao menos 8 caracteres.' });
   if (usuarios.porNome(usuario)) return res.status(409).json({ erro: 'Já existe um usuário com esse nome.' });
-  res.status(201).json(publico(usuarios.cria(usuario, await bcrypt.hash(senha, 12), admin)));
+  res.status(201).json(publico(usuarios.cria(usuario, await bcrypt.hash(senha, 12), admin, operador)));
 });
 
 app.delete('/api/usuarios/:id', exigeLogin, exigeAdmin, (req, res) => {

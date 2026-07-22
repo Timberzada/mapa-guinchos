@@ -161,14 +161,19 @@ label.ck input{width:auto}
     <div class="pane" id="p-cfg">
       <div class="box">
         <h3>Usuários</h3>
-        <div class="hint" style="margin-top:0">Quem pode entrar no sistema. Administradores também cadastram empresas e gerenciam contas.</div>
+        <div class="hint" style="margin-top:0">Cargos: <b>Administrador</b> faz tudo (empresas, usuários, backup, auditoria); <b>Operador</b> cadastra e remove empresas; <b>Usuário</b> só visualiza.</div>
         <div id="listaUsers" style="margin-top:10px"></div>
         <label>Novo usuário</label>
         <div class="row">
           <input class="f" id="cUN" placeholder="usuário" autocomplete="off">
           <input class="f" id="cUP" type="password" placeholder="senha (8+)" autocomplete="new-password">
         </div>
-        <label class="ck"><input type="checkbox" id="cUA"> Administrador</label>
+        <label>Cargo</label>
+        <select class="f" id="cUP2">
+          <option value="usuario">Usuário — só visualiza</option>
+          <option value="operador">Operador — cadastra/remove empresas</option>
+          <option value="admin">Administrador — acesso total</option>
+        </select>
         <div style="margin-top:12px"><button class="primary" id="btnUserAdd">Adicionar usuário</button></div>
         <div id="accMsg" style="font-size:12px;margin-top:10px"></div>
       </div>
@@ -202,6 +207,10 @@ let CIDADES=null, DADOS=[], EU=null, MODO='login';
 let ufSel='', destaque=null, pronto=false;
 let map=null, mapaPronto=false, ultimaLista=[], popup=null;
 const $=s=>document.querySelector(s);
+// papéis: admin > operador > usuário. Operador gerencia empresas; admin faz tudo.
+const podeGerir=()=>!!(EU&&(EU.admin||EU.operador));
+const papelDe=u=>u.admin?'Administrador':u.operador?'Operador':'Usuário';
+const iconeDe=u=>u.admin?'👑':u.operador?'🛠️':'👤';
 
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
@@ -353,7 +362,7 @@ function ajustaEstiloBase(){
       map.moveLayer('place_state');   // topo da pilha = prioridade máxima na colisão
     }catch(e){}
   }
-  window.__ajusteEstados = 'v9-auditoria';   // marcador p/ verificar o deploy
+  window.__ajusteEstados = 'v10-cargo-operador';   // marcador p/ verificar o deploy
 }
 function montaCamadas(){
   if(camadasFeitas) return;
@@ -471,10 +480,10 @@ async function boot(){
 async function entrou(){
   pronto=true;
   $('#gate').classList.remove('on');
-  $('#quem').textContent=(EU.admin?'👑 ':'👤 ')+EU.usuario;
-  $('#quem').style.color=EU.admin?'#ffb020':'#8d99a8';
-  document.querySelector('.tabs button[data-t=add]').hidden=!EU.admin;
-  document.querySelector('.tabs button[data-t=cfg]').hidden=!EU.admin;
+  $('#quem').textContent=iconeDe(EU)+' '+EU.usuario+' · '+papelDe(EU);
+  $('#quem').style.color=EU.admin?'#ffb020':EU.operador?'#31d07a':'#8d99a8';
+  document.querySelector('.tabs button[data-t=add]').hidden=!podeGerir();   // operador tbm cadastra
+  document.querySelector('.tabs button[data-t=cfg]').hidden=!EU.admin;      // usuários/backup/auditoria só admin
   $('#btnExport').hidden=!EU.admin;   // backup só para administradores
   DADOS=await api('empresas');
   if(EU.admin) carregaUsuarios();
@@ -525,8 +534,8 @@ function render(){
       <div class="n"><i style="background:${CORES[e.tipo]}"></i>${esc(e.nome)}</div>
       <div class="m"><span>${esc(e.cidade)} – ${e.uf}</span>${botaoZap(e.telefone)}</div>
       <div class="m"><span style="color:${CORES[e.tipo]}">${ROTULO[e.tipo]}</span>
-        ${EU.admin?`<button class="danger rm" data-id="${e.id}" style="padding:2px 8px;font-size:11px">remover</button>`:''}</div>
-    </div>`).join('') : `<div class="empty">Nenhuma empresa encontrada.${EU.admin?'<br>Use a aba <b>Adicionar</b>.':''}</div>`;
+        ${podeGerir()?`<button class="danger rm" data-id="${e.id}" style="padding:2px 8px;font-size:11px">remover</button>`:''}</div>
+    </div>`).join('') : `<div class="empty">Nenhuma empresa encontrada.${podeGerir()?'<br>Use a aba <b>Adicionar</b>.':''}</div>`;
   $('#lista').querySelectorAll('.card').forEach(c=>c.onclick=ev=>{
     if(ev.target.closest('.rm,.zap'))return;
     destaque=c.dataset.id;
@@ -570,8 +579,8 @@ async function carregaUsuarios(){
   const us=await api('usuarios');
   $('#listaUsers').innerHTML=us.map(u=>`
     <div class="card" style="cursor:default">
-      <div class="n">${u.admin?'👑':'👤'} ${esc(u.usuario)}${u.id===EU.id?' <span class="badge">você</span>':''}</div>
-      <div class="m"><span>${u.admin?'administrador':'só visualiza'}</span>
+      <div class="n">${iconeDe(u)} ${esc(u.usuario)}${u.id===EU.id?' <span class="badge">você</span>':''}</div>
+      <div class="m"><span>${u.admin?'administrador':u.operador?'operador (gerencia empresas)':'só visualiza'}</span>
         <span>
           <button class="pw" data-id="${u.id}" data-u="${esc(u.usuario)}" style="padding:2px 8px;font-size:11px">senha</button>
           ${u.id!==EU.id?`<button class="danger del" data-id="${u.id}" data-u="${esc(u.usuario)}" style="padding:2px 8px;font-size:11px;margin-left:4px">remover</button>`:''}
@@ -583,8 +592,8 @@ async function carregaUsuarios(){
 $('#btnUserAdd').onclick=async()=>{
   const M=$('#accMsg');
   try{
-    await api('usuarios',{method:'POST',body:{usuario:$('#cUN').value.trim(),senha:$('#cUP').value,admin:$('#cUA').checked}});
-    $('#cUN').value=''; $('#cUP').value=''; $('#cUA').checked=false;
+    await api('usuarios',{method:'POST',body:{usuario:$('#cUN').value.trim(),senha:$('#cUP').value,papel:$('#cUP2').value}});
+    $('#cUN').value=''; $('#cUP').value=''; $('#cUP2').value='usuario';
     msg(M,'✓ Usuário criado.','ok'); carregaUsuarios();
   }catch(e){ msg(M,e.message,'err'); }
 };
