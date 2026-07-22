@@ -305,7 +305,9 @@ function ajustaEstiloBase(){
   }
 
   // Nome do estado com PRIORIDADE sobre metrópoles: todos os 27 estados,
-  // movido para a 1ª camada de rótulo (vence a colisão), maior e com halo.
+  // maior e com halo. No MapLibre, a ÚLTIMA camada de rótulo vence a colisão,
+  // então movemos place_state para o topo — assim o nome do estado ganha do
+  // nome da metrópole quando os dois se sobrepõem.
   if(map.getLayer('place_state')){
     try{
       map.setFilter('place_state',['==','class','state']);        // todos os estados, não só rank<=4
@@ -315,10 +317,10 @@ function ajustaEstiloBase(){
       map.setPaintProperty('place_state','text-halo-width',1.5);
       map.setLayoutProperty('place_state','text-size',
         ['interpolate',['linear'],['zoom'],3,12,6,16,9,18]);
-      if(primeiroPlace) map.moveLayer('place_state', primeiroPlace);  // colocado primeiro = prioridade na colisão
+      map.moveLayer('place_state');   // topo da pilha = prioridade máxima na colisão
     }catch(e){}
   }
-  window.__ajusteEstados = 'v2-divisao+prioridade';   // marcador p/ verificar o deploy
+  window.__ajusteEstados = 'v3-prioridade-topo';   // marcador p/ verificar o deploy
 }
 function montaCamadas(){
   if(camadasFeitas) return;
