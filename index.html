@@ -174,10 +174,19 @@ label.ck input{width:auto}
       </div>
       <div class="box">
         <h3>Backup</h3>
-        <div class="hint" style="margin-top:0">Importar substitui toda a lista atual.</div>
+        <div class="hint" style="margin-top:0">Exportar e importar são exclusivos de administrador. Importar substitui toda a lista atual.</div>
         <label>Importar backup (.json)</label>
         <input class="f" type="file" id="fImport" accept="application/json">
         <div id="impMsg" style="font-size:12px;margin-top:10px"></div>
+      </div>
+      <div class="box">
+        <div style="display:flex;align-items:center;gap:8px">
+          <h3 style="margin:0">Auditoria</h3>
+          <span class="sp" style="flex:1"></span>
+          <button id="btnAudit" style="padding:4px 9px;font-size:12px">Atualizar</button>
+        </div>
+        <div class="hint" style="margin-top:6px">Quem acessou a base completa, exportou ou entrou — e quando.</div>
+        <div id="listaAudit" style="margin-top:10px"></div>
       </div>
     </div>
   </aside>
@@ -344,7 +353,7 @@ function ajustaEstiloBase(){
       map.moveLayer('place_state');   // topo da pilha = prioridade máxima na colisão
     }catch(e){}
   }
-  window.__ajusteEstados = 'v8-export-so-admin';   // marcador p/ verificar o deploy
+  window.__ajusteEstados = 'v9-auditoria';   // marcador p/ verificar o deploy
 }
 function montaCamadas(){
   if(camadasFeitas) return;
@@ -553,6 +562,7 @@ $('#btnLimpar').onclick=()=>['aCidade','aNome','aTel'].forEach(i=>$('#'+i).value
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='p-'+b.dataset.t));
+  if(b.dataset.t==='cfg' && EU && EU.admin) carregaAudit();   // carrega auditoria ao abrir a aba
 });
 
 /* ---------- usuários ---------- */
@@ -593,9 +603,29 @@ async function trocaSenha(id,u){
 /* ---------- backup ---------- */
 $('#btnExport').onclick=()=>{
   if(!EU||!EU.admin) return;   // trava: só administrador exporta o backup
+  api('audit/export',{method:'POST',body:{qtd:DADOS.length}}).catch(()=>{});   // registra na auditoria
   const b=new Blob([JSON.stringify(DADOS,null,1)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='empresas-backup.json'; a.click();
 };
+const EVENTOS={login:'entrou',login_falha:'login falhou',acesso_lista:'acessou a base',export:'exportou backup'};
+async function carregaAudit(){
+  const box=$('#listaAudit');
+  try{
+    const evs=await api('audit?n=200');
+    if(!evs.length){ box.innerHTML='<div class="empty" style="padding:14px">Sem registros ainda.</div>'; return; }
+    const fmt=t=>{ const d=new Date(t); return d.toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}); };
+    box.innerHTML=evs.map(e=>{
+      const cor=e.evento==='export'?'#ffb020':e.evento==='login_falha'?'#ff8080':'var(--mut)';
+      const quem=esc(e.usuario||e.alvo||'—');
+      const det=e.evento==='acesso_lista'?` · ${e.qtd??'?'} itens`:e.evento==='export'?` · ${e.qtd??'?'} itens`:'';
+      return `<div class="card" style="cursor:default;padding:8px 10px">
+        <div class="n" style="font-size:12.5px"><span style="color:${cor}">${esc(EVENTOS[e.evento]||e.evento)}</span> — ${quem}</div>
+        <div class="m" style="margin-top:2px"><span>${fmt(e.t)}${det}</span><span style="color:var(--mut)">${esc(e.ip||'')}</span></div>
+      </div>`;
+    }).join('');
+  }catch(err){ box.innerHTML=`<div class="err" style="font-size:12px">Erro ao carregar: ${esc(err.message)}</div>`; }
+}
+$('#btnAudit').onclick=carregaAudit;
 $('#fImport').onchange=async e=>{
   const f=e.target.files[0]; if(!f)return; const M=$('#impMsg');
   if(!confirm('Importar substitui toda a lista atual. Continuar?')){ e.target.value=''; return; }

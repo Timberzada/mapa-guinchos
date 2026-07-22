@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { usuarios, empresas, salva } from './db.js';
 import { criaToken, defineCookie, limpaCookie, sessao, exigeLogin, exigeAdmin } from './auth.js';
+import { registra as audita, ultimos as auditoria } from './audit.js';
 
 const raiz = path.dirname(fileURLToPath(import.meta.url));
 const PUB = raiz;   // estáticos ficam na raiz, servidos por whitelist explícita
@@ -70,8 +71,9 @@ app.post('/api/login', limite(20, 15), async (req, res) => {
   // compara sempre, mesmo sem usuário, para não vazar quais nomes existem
   const hash = u?.senha_hash || '$2a$12$' + 'x'.repeat(53);
   const ok = await bcrypt.compare(senha, hash);
-  if (!u || !ok) return res.status(401).json({ erro: 'Usuário ou senha incorretos.' });
+  if (!u || !ok) { audita('login_falha', req, { alvo: usuario }); return res.status(401).json({ erro: 'Usuário ou senha incorretos.' }); }
   defineCookie(res, criaToken(u));
+  audita('login', req, { usuario: u.usuario, id: u.id });
   res.json({ usuario: publico(u) });
 });
 
@@ -79,7 +81,23 @@ app.post('/api/logout', (_req, res) => { limpaCookie(res); res.json({ ok: true }
 
 /* ================= empresas ================= */
 
-app.get('/api/empresas', exigeLogin, (_req, res) => res.json(empresas.lista()));
+app.get('/api/empresas', exigeLogin, (req, res) => {
+  const lista = empresas.lista();
+  audita('acesso_lista', req, { qtd: lista.length });   // quem puxou a base completa
+  res.json(lista);
+});
+
+// registra a exportação de backup (feita no cliente); admin apenas.
+app.post('/api/audit/export', exigeLogin, exigeAdmin, (req, res) => {
+  audita('export', req, { qtd: Number(req.body?.qtd) || undefined });
+  res.json({ ok: true });
+});
+
+// consulta do log de auditoria; admin apenas.
+app.get('/api/audit', exigeLogin, exigeAdmin, (req, res) => {
+  const n = Math.min(1000, Math.max(1, Number(req.query.n) || 300));
+  res.json(auditoria(n));
+});
 
 app.post('/api/empresas', exigeLogin, exigeAdmin, (req, res) => {
   const nome = txt(req.body?.nome, 120);
