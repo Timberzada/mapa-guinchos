@@ -248,6 +248,7 @@ function iniciaMapa(){
     preserveDrawingBuffer:true
   });
   map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');
+  window.__map=map;   // handle só-leitura p/ diagnóstico do estilo (inofensivo)
   // Vários gatilhos + tentativas contínuas: em alguns navegadores 'load'/'idle'
   // e isStyleLoaded() não sinalizam direito com estilo vetorial externo.
   map.on('load', montaCamadas);
